@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Waiter, WaiterShift } from '../types';
 import { formatKES } from '../api/client';
 import { useTranslation } from '../i18n';
@@ -14,6 +14,7 @@ import {
   LogOut, 
   AlertTriangle,
   Globe,
+  ChevronDown,
   Lock,
   Smartphone,
   Layers,
@@ -48,256 +49,263 @@ export const Header: React.FC<HeaderProps> = ({
   onTriggerInstall
 }) => {
   const { t, language, setLanguage, languages } = useTranslation();
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
 
-  // Role enforcement: Standard waiters only see POS (Bestellen & Abrechnen) and Shift (Ein-/Ausstempeln & Kassensturz)
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setLangDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Standard waiters only see POS and Shift
   const isStandardWaiter = !activeWaiter || activeWaiter.role === 'waiter';
+  const currentRole = activeWaiter?.role || 'waiter';
 
-  // Definition of all possible navigation tabs with allowed roles
+  // Helper for 2-letter avatar initials (stripping parenthesis like (Manager))
+  const getInitials = (name: string) => {
+    const clean = name.replace(/\(.*?\)/g, '').trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'U';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  // Definition of all navigation tabs with allowed roles
   const allNavItems = [
     { 
       id: 'pos', 
       label: t('nav.pos'), 
-      icon: <LayoutGrid size={18} />, 
+      icon: <LayoutGrid size={16} />, 
       allowedRoles: ['waiter', 'manager', 'admin'] 
     },
     { 
       id: 'shift', 
       label: t('nav.shift'), 
-      icon: <Wallet size={18} />, 
+      icon: <Wallet size={16} />, 
       allowedRoles: ['waiter', 'manager', 'admin'] 
     },
     { 
       id: 'inventory', 
       label: t('nav.inventory'), 
-      icon: <Boxes size={18} />, 
+      icon: <Boxes size={16} />, 
       badge: lowStockCount > 0 ? lowStockCount : undefined, 
       allowedRoles: ['manager', 'admin'] 
     },
     { 
       id: 'recipes', 
       label: t('nav.recipes'), 
-      icon: <Utensils size={18} />, 
+      icon: <Utensils size={16} />, 
       allowedRoles: ['manager', 'admin'] 
     },
     { 
       id: 'closing', 
       label: t('nav.closing'), 
-      icon: <FileSpreadsheet size={18} />, 
+      icon: <FileSpreadsheet size={16} />, 
       allowedRoles: ['manager', 'admin'] 
     },
     { 
       id: 'staff', 
       label: t('nav.staff'), 
-      icon: <Users size={18} />, 
+      icon: <Users size={16} />, 
       allowedRoles: ['manager', 'admin'] 
     },
     { 
       id: 'display', 
       label: t('nav.display'), 
-      icon: <Tv size={18} />, 
+      icon: <Tv size={16} />, 
       allowedRoles: ['manager', 'admin'] 
     },
     { 
       id: 'settings', 
       label: t('nav.settings'), 
-      icon: (activeWaiter?.role === 'admin') ? <Sliders size={18} /> : <Lock size={16} color="var(--primary)" />, 
+      icon: (activeWaiter?.role === 'admin') ? <Sliders size={16} /> : <Lock size={15} color="var(--primary)" />, 
       allowedRoles: ['admin'] 
     }
   ];
 
   // If in waiter mode or user is a waiter, filter strictly to POS & Shift
-  const currentRole = activeWaiter?.role || 'waiter';
   const navItems = (isWaiterMode || isStandardWaiter)
     ? allNavItems.filter(item => item.id === 'pos' || item.id === 'shift')
     : allNavItems.filter(item => item.allowedRoles.includes(currentRole));
 
   return (
     <header className="navbar">
-      {/* Brand & Mode Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{
-          width: '36px',
-          height: '36px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 800,
-          color: '#0d1117',
-          fontSize: '1.2rem',
-          boxShadow: '0 2px 10px rgba(245, 158, 11, 0.4)',
-          flexShrink: 0
-        }}>
+      {/* Brand & Role Status */}
+      <div className="navbar-brand-group">
+        <div className="navbar-logo-badge" title="KeniaRMS">
           K
         </div>
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontWeight: 800, fontSize: '1.15rem', letterSpacing: '-0.02em' }}>KeniaRMS</span>
-            <span style={{ 
-              fontSize: '0.62rem', 
-              background: isStandardWaiter || isWaiterMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)', 
-              color: isStandardWaiter || isWaiterMode ? '#34d399' : 'var(--primary)', 
-              padding: '2px 6px', 
-              borderRadius: '4px',
-              fontWeight: 800,
-              letterSpacing: '0.04em'
-            }}>
-              {isStandardWaiter || isWaiterMode ? t('waiter_app.badge').toUpperCase() : 'KENYA • KES'}
+            <span className="navbar-brand-name">KeniaRMS</span>
+            <span className={`navbar-role-pill ${isStandardWaiter || isWaiterMode ? 'waiter' : currentRole}`}>
+              <span className={`role-dot ${isStandardWaiter || isWaiterMode ? 'waiter' : currentRole}`} />
+              {isStandardWaiter || isWaiterMode 
+                ? t('waiter_app.badge') 
+                : t(`nav.role_${currentRole}`) || currentRole}
             </span>
-            <span style={{ 
-              fontSize: '0.62rem', 
-              background: 'rgba(255, 255, 255, 0.08)', 
-              color: 'var(--text-muted)', 
-              padding: '2px 5px', 
-              borderRadius: '4px',
-              fontWeight: 600
-            }}>
-              v1.1.1
+            <span className="navbar-version-tag">
+              v1.1.2
             </span>
           </div>
         </div>
       </div>
 
-      {/* Navigation Tabs - Strictly Filtered by Role */}
-      <nav className="nav-links">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(item.id)}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-            {item.badge !== undefined && (
-              <span style={{
-                background: '#ef4444',
-                color: '#fff',
-                fontSize: '0.7rem',
-                padding: '1px 6px',
-                borderRadius: '999px',
-                fontWeight: 700
-              }}>
-                {item.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </nav>
-
-      {/* Right Controls: Install App Button, Language Switcher, Low Stock & Waiter Status */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        {/* PWA Install Button */}
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onTriggerInstall}
-          title={t('waiter_app.install_btn')}
-          style={{
-            padding: '5px 10px',
-            minHeight: '32px',
-            fontSize: '0.78rem',
-            background: 'rgba(245, 158, 11, 0.1)',
-            borderColor: 'rgba(245, 158, 11, 0.3)',
-            color: 'var(--primary)',
-            borderRadius: 'var(--radius-sm)'
-          }}
-        >
-          <Smartphone size={14} />
-          <span className="pwa-install-text">{t('waiter_app.install_btn')}</span>
-        </button>
-
-        {/* Manager/Admin toggle between Full View and Waiter Mode */}
-        {activeWaiter && (activeWaiter.role === 'manager' || activeWaiter.role === 'admin') && onToggleWaiterMode && (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={onToggleWaiterMode}
-            title={isWaiterMode ? t('waiter_app.switch_to_full') : t('waiter_app.switch_to_waiter')}
-            style={{ padding: '5px 8px', minHeight: '32px', fontSize: '0.78rem' }}
-          >
-            <Layers size={14} />
-            <span>{isWaiterMode ? t('waiter_app.switch_to_full') : t('waiter_app.switch_to_waiter')}</span>
-          </button>
-        )}
-
-        {/* Language Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'var(--bg-surface)', padding: '2px 4px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-          <Globe size={13} color="var(--text-dim)" style={{ marginLeft: '4px' }} />
-          {languages.map(lang => (
+      {/* Center Navigation - Segmented Modern Pill */}
+      <nav className="navbar-nav">
+        <div className="nav-segmented-pill">
+          {navItems.map((item) => (
             <button
-              key={lang.code}
+              key={item.id}
               type="button"
-              className="btn btn-ghost"
-              onClick={() => setLanguage(lang.code)}
-              style={{
-                padding: '2px 6px',
-                minHeight: '26px',
-                fontSize: '0.75rem',
-                fontWeight: language === lang.code ? 800 : 500,
-                color: language === lang.code ? 'var(--primary)' : 'var(--text-muted)',
-                background: language === lang.code ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
-                borderRadius: '4px'
-              }}
-              title={lang.label}
+              className={`nav-tab-btn ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(item.id)}
             >
-              {lang.flag} {lang.code.toUpperCase()}
+              <span>{item.icon}</span>
+              <span className="nav-tab-text">{item.label}</span>
+              {item.badge !== undefined && (
+                <span className="nav-tab-badge">
+                  {item.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
+      </nav>
 
-        {/* Low Stock Warning (Manager/Admin Only) */}
+      {/* Right-Side Utility Controls */}
+      <div className="navbar-utils">
+        {/* Low Stock Alert Button (Manager/Admin Only) */}
         {!isStandardWaiter && !isWaiterMode && lowStockCount > 0 && (
           <button 
-            className="btn btn-ghost" 
+            type="button"
+            className="header-alert-btn" 
             onClick={onNavigateToShoppingList}
-            title={t('nav.low_stock_warning')}
-            style={{ 
-              color: '#f87171', 
-              background: 'rgba(239, 68, 68, 0.12)', 
-              padding: '5px 8px',
-              fontSize: '0.78rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              minHeight: '32px'
-            }}
+            title={`${lowStockCount} ${t('nav.low_stock_warning')}`}
           >
-            <AlertTriangle size={14} />
+            <AlertTriangle size={15} />
             <span>{lowStockCount}</span>
           </button>
         )}
 
-        {/* Active Waiter Badge / Login Button */}
+        {/* Manager/Admin toggle between Full View and Waiter Terminal */}
+        {activeWaiter && (activeWaiter.role === 'manager' || activeWaiter.role === 'admin') && onToggleWaiterMode && (
+          <button
+            type="button"
+            className={`header-util-btn ${isWaiterMode ? 'active' : ''}`}
+            onClick={onToggleWaiterMode}
+            title={isWaiterMode ? t('waiter_app.switch_to_full') : t('waiter_app.switch_to_waiter')}
+          >
+            <Layers size={14} />
+            <span className="header-util-label">
+              {isWaiterMode ? t('waiter_app.switch_to_full') : t('waiter_app.switch_to_waiter')}
+            </span>
+          </button>
+        )}
+
+        {/* PWA Install Button */}
+        <button
+          type="button"
+          className="header-util-btn"
+          onClick={onTriggerInstall}
+          title={t('waiter_app.install_btn')}
+        >
+          <Smartphone size={14} color="var(--primary)" />
+          <span className="header-util-label">{t('nav.install_app')}</span>
+        </button>
+
+        {/* Language Switcher Dropdown */}
+        <div style={{ position: 'relative' }} ref={langRef}>
+          <button
+            type="button"
+            className="header-util-btn"
+            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+            title="Language / Sprache / Lugha"
+            style={{ minWidth: '68px', justifyContent: 'space-between' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Globe size={14} color="var(--primary)" />
+              <span style={{ fontWeight: 700, fontSize: '0.78rem' }}>{language.toUpperCase()}</span>
+            </div>
+            <ChevronDown 
+              size={11} 
+              color="var(--text-muted)" 
+              style={{ 
+                transform: langDropdownOpen ? 'rotate(180deg)' : 'none', 
+                transition: 'transform 0.15s ease' 
+              }} 
+            />
+          </button>
+
+          {langDropdownOpen && (
+            <div className="header-dropdown-menu">
+              {languages.map(lang => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  className={`header-dropdown-item ${language === lang.code ? 'active' : ''}`}
+                  onClick={() => {
+                    setLanguage(lang.code);
+                    setLangDropdownOpen(false);
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <span style={{ fontSize: '0.95rem' }}>{lang.flag}</span>
+                    <span>{lang.label}</span>
+                  </span>
+                  {language === lang.code && <span style={{ color: 'var(--primary)', fontWeight: 800 }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Active Waiter Profile / Login Capsule */}
         {activeWaiter ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'var(--bg-surface-elevated)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '3px 8px'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
-              <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{activeWaiter.name}</span>
-              <span style={{ fontSize: '0.68rem', color: activeShift ? 'var(--accent-emerald)' : 'var(--text-dim)' }}>
-                {activeShift ? `${t('waiter_app.shift_status')}: ${formatKES(activeShift.starting_float)}` : t('nav.no_shift')}
-              </span>
+          <div className="header-user-pill">
+            <div 
+              className={`user-avatar-circle user-avatar-${activeWaiter.role}`}
+              title={`${activeWaiter.name} (${t(`nav.role_${activeWaiter.role}`) || activeWaiter.role})`}
+            >
+              {getInitials(activeWaiter.name)}
+            </div>
+            <div className="user-info-text">
+              <span className="user-name">{activeWaiter.name.replace(/\(.*?\)/g, '').trim()}</span>
+              {activeShift ? (
+                <span className="user-shift-status">
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                  {formatKES(activeShift.starting_float)}
+                </span>
+              ) : (
+                <span className="user-no-shift">
+                  {t(`nav.role_${activeWaiter.role}`) || activeWaiter.role}
+                </span>
+              )}
             </div>
             <button 
-              className="btn btn-ghost" 
+              type="button"
+              className="user-logout-btn" 
               onClick={onLogout}
-              style={{ padding: '4px', color: 'var(--text-muted)' }}
               title={t('nav.logout')}
             >
-              <LogOut size={15} />
+              <LogOut size={14} />
             </button>
           </div>
         ) : (
-          <button className="btn btn-primary" onClick={onOpenLogin} style={{ padding: '6px 12px', fontSize: '0.82rem', minHeight: '32px' }}>
+          <button 
+            type="button"
+            className="btn btn-primary" 
+            onClick={onOpenLogin} 
+            style={{ padding: '6px 14px', fontSize: '0.82rem', minHeight: '34px', gap: '6px' }}
+          >
             <User size={15} />
-            {t('nav.login')}
+            <span>{t('nav.login')}</span>
           </button>
         )}
       </div>

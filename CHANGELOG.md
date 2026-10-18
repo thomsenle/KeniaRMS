@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.2] - 2026-10-18
+
+### Patch Release: Modern Clean Navbar & Restructured Top Navigation
+
+#### Added & Improved
+- **Modern Clean Navbar & Restructured Navigation Bar:**
+  - Redesigned the top header to guarantee a balanced single-row, non-wrapping layout across all screen sizes.
+  - Introduced a centered segmented navigation capsule (`.nav-segmented-pill`) with punchy, clear tab labels ("Tische", "Kasse", "Lager", "Rezepte", "Abschluss", "Personal", "TV-Display", "Setup") and subtle amber active glow.
+  - Replaced wide inline language buttons with a compact glassmorphism language dropdown menu (`🌐 DE ▾`) supporting German, English, and Kiswahili.
+  - Refined user profile capsule with role-colored 2-letter avatar initials (Emerald for Waiter, Amber for Manager, Purple for Admin), clean staff name without redundant parentheses, live shift float indicator, and sleek logout button.
+  - Standardized toolbar height (34–38px) and border styling across low stock alert, terminal mode toggle, PWA install button, language selector, and user capsule.
+  - 100% strict i18n localization in German, English, and Kiswahili across all top navigation labels and tooltips.
+
+---
+
 ## [1.1.1] - 2026-10-18
 
 ### Patch Release: 5 Researched Local Competitors & Price Comparison Badges in AI Recipe Assistant

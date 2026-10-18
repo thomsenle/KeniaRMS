@@ -30,20 +30,35 @@
     "add": "Hinzufügen"
   },
   "nav": {
-    "pos": "Tische & Kasse",
-    "inventory": "Lager & Einkauf",
-    "recipes": "Rezepte & Karte",
-    "shift": "Kellner-Kasse",
+    "pos": "Tische",
+    "inventory": "Lager",
+    "recipes": "Rezepte",
+    "shift": "Kasse",
     "closing": "Abschluss",
-    "staff": "Personal & Dienstplan",
+    "staff": "Personal",
     "display": "TV-Display",
-    "settings": "Drucker & Setup",
-    "login": "Kellner Login",
+    "settings": "Setup",
+    "login": "Anmelden",
     "logout": "Abmelden",
     "active_shift": "Schicht aktiv",
     "no_shift": "Keine Schicht",
     "low_stock_warning": "Artikel im Meldebestand",
-    "back_to_pos": "← Zurück zum Kassensystem"
+    "back_to_pos": "← Zurück zum Kassensystem",
+    "role_waiter": "Kellner",
+    "role_manager": "Manager",
+    "role_admin": "Admin",
+    "switch_to_waiter": "Kellner-Terminal",
+    "switch_to_full": "Vollansicht",
+    "install_app": "App installieren"
+  },
+  "waiter_app": {
+    "badge": "Kellner-Terminal",
+    "tables_tab": "Tische",
+    "shift_tab": "Kasse",
+    "switch_to_waiter": "Zu Kellner-Terminal wechseln",
+    "switch_to_full": "Zu Vollansicht wechseln",
+    "install_btn": "App installieren",
+    "shift_status": "Schicht"
   },
   "login": {
     "title": "Kellner-Anmeldung",

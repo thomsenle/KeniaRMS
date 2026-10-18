@@ -1,6 +1,6 @@
 {
   "name": "keniarms",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "KeniaRMS - Modern Restaurant Management, Waiter POS & Digital Signage System tailored for Kenya (KES, M-Pesa, 16% VAT, 2% Catering Levy)",
   "private": true,
   "workspaces": [

@@ -1,6 +1,6 @@
 {
   "name": "kenia-rms-server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "KeniaRMS - Backend Restaurant Management & POS System",
   "main": "dist/index.js",
   "scripts": {

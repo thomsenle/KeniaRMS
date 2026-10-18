@@ -285,6 +285,15 @@ export interface DisplayScreen {
   updated_at?: string;
 }
 
+export interface CompetitorQuote {
+  name: string;
+  venue_type: string;
+  location: string;
+  distance_km?: number;
+  dish_name: string;
+  price_kes: number;
+}
+
 export interface AiMarketBenchmark {
   location: string;
   radius_km: number;
@@ -294,6 +303,7 @@ export interface AiMarketBenchmark {
   food_cost_kes: number;
   gross_margin_percent: number;
   rationale: string;
+  competitors?: CompetitorQuote[];
 }
 
 export interface AiGeneratedIngredient {

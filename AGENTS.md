@@ -22,7 +22,7 @@ KeniaRMS is designed to run reliably on local restaurant hardware (e.g., Mini-PC
    - **KI-gestützte Rezeptgenerierung & Regionale Preisbildung:**
      - Automatisches Erstellen von Speisen & Drinks per KI (Google Gemini mit Offline-Fallback auf die Kenia-Coast Gastronomie-Wissensdatenbank).
      - Regionale Marktrecherche & Preis-Benchmark im Umkreis des konfigurierten Standorts (Standard: **Diani Beach**, einstellbar über Manager-Konfiguration).
-     - Ausweisung von Wareneinsatz (Food Cost in KES), Bruttomargen (%) und Konkurrenzpreis-Spanne (Budget, Durchschnitt, Beachfront).
+     - Ausweisung von Wareneinsatz (Food Cost in KES), Bruttomargen (%), Konkurrenzpreis-Spanne (Budget, Durchschnitt, Beachfront) sowie Anzeige von 5 konkreten regionalen Mitbewerbern mit Venue-Typ, Entfernungen, Vergleichsgerichten und dynamischen Preisvergleichs-Badges.
      - **Automatische Lager-Zutatenübernahme:** Beim Übernehmen eines generierten Rezepts werden alle noch nicht existierenden Zutaten automatisch in der Lagerverwaltung (`inventory_items`) angelegt, initial verbucht und mit dem Rezept verknüpft.
 3. **Kellner-Bestell- & Abrechnungsmodul (POS & Waiter Service):**
    - Interactive table map (rooms, outdoor/terrace, status indicators).

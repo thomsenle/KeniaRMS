@@ -153,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
               borderRadius: '4px',
               fontWeight: 600
             }}>
-              v1.1.0
+              v1.1.1
             </span>
           </div>
         </div>

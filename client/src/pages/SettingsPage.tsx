@@ -27,7 +27,9 @@ import {
   Sparkles,
   MapPin,
   TrendingUp,
-  Percent
+  Percent,
+  Store,
+  Navigation
 } from 'lucide-react';
 import { TableManagerModal } from '../components/TableManagerModal';
 
@@ -1333,7 +1335,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '4px' }}>{testBenchmarkResult.description}</p>
                   </div>
                   <span className="badge badge-success" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
-                    Empfohlener Preis: KES {testBenchmarkResult.suggested_price.toLocaleString()}
+                    {t('recipes.ai_suggested_price')} KES {testBenchmarkResult.suggested_price.toLocaleString()}
                   </span>
                 </div>
 
@@ -1359,6 +1361,154 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
                     <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#a7f3d0' }}>{testBenchmarkResult.market_benchmark.gross_margin_percent}%</div>
                   </div>
                 </div>
+
+                {/* 5 RESEARCHED COMPETITORS TABLE */}
+                {testBenchmarkResult.market_benchmark.competitors && testBenchmarkResult.market_benchmark.competitors.length > 0 && (
+                  <div style={{
+                    marginTop: '16px',
+                    marginBottom: '14px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Store size={18} color="#38bdf8" />
+                        <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700 }}>
+                          {t('recipes.ai_competitors_title')}
+                        </h4>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {t('recipes.ai_competitors_subtitle')}
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                        <thead>
+                          <tr style={{
+                            color: 'var(--text-muted)',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                            textAlign: 'left',
+                            fontSize: '0.74rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em'
+                          }}>
+                            <th style={{ padding: '10px 14px' }}>{t('recipes.col_competitor_venue')}</th>
+                            <th style={{ padding: '10px 14px' }}>{t('recipes.col_competitor_distance')}</th>
+                            <th style={{ padding: '10px 14px' }}>{t('recipes.col_competitor_dish')}</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right' }}>{t('recipes.col_competitor_price')}</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right' }}>{t('recipes.col_competitor_diff')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {testBenchmarkResult.market_benchmark.competitors.slice(0, 5).map((comp, cIdx) => {
+                            const diff = comp.price_kes - testBenchmarkResult.suggested_price;
+                            const pct = testBenchmarkResult.suggested_price > 0 
+                              ? Math.round((Math.abs(diff) / testBenchmarkResult.suggested_price) * 100) 
+                              : 0;
+
+                            return (
+                              <tr 
+                                key={cIdx} 
+                                style={{
+                                  borderBottom: cIdx < 4 ? '1px solid rgba(255, 255, 255, 0.04)' : 'none',
+                                  transition: 'background 0.15s ease'
+                                }}
+                              >
+                                <td style={{ padding: '10px 14px' }}>
+                                  <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.88rem' }}>
+                                    {comp.name}
+                                  </div>
+                                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    <span>{comp.venue_type}</span>
+                                    <span>•</span>
+                                    <span>{comp.location}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.78rem',
+                                    color: 'var(--text-muted)',
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px'
+                                  }}>
+                                    <Navigation size={12} color="#38bdf8" />
+                                    {comp.distance_km ? `${comp.distance_km} km` : '~ 1.5 km'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px 14px' }}>
+                                  <div style={{ fontStyle: 'italic', color: 'var(--text-dim)', fontSize: '0.82rem' }}>
+                                    "{comp.dish_name}"
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, fontSize: '0.92rem', color: '#f1f5f9', whiteSpace: 'nowrap' }}>
+                                  KES {comp.price_kes.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '10px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                  {diff > 0 ? (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      background: 'rgba(245, 158, 11, 0.15)',
+                                      color: '#fbbf24',
+                                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                                      borderRadius: '4px',
+                                      padding: '2px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700
+                                    }}>
+                                      +KES {diff.toLocaleString()} (+{pct}% {t('recipes.price_diff_higher')})
+                                    </span>
+                                  ) : diff < 0 ? (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      background: 'rgba(56, 189, 248, 0.15)',
+                                      color: '#38bdf8',
+                                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                                      borderRadius: '4px',
+                                      padding: '2px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700
+                                    }}>
+                                      -KES {Math.abs(diff).toLocaleString()} (-{pct}% {t('recipes.price_diff_lower')})
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      background: 'rgba(16, 185, 129, 0.15)',
+                                      color: '#34d399',
+                                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                                      borderRadius: '4px',
+                                      padding: '2px 8px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 700
+                                    }}>
+                                      ±0 ({t('recipes.price_diff_same')})
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-dim)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', lineHeight: 1.4 }}>
                   <strong>{t('recipes.ai_rationale_title')}</strong> {testBenchmarkResult.market_benchmark.rationale}

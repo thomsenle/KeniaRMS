@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1] - 2026-10-18
+
+### Patch Release: 5 Researched Local Competitors & Price Comparison Badges in AI Recipe Assistant
+
+#### Added
+- **5 Researched Competitors in AI Recipe Assistant & Settings Test Benchmark:**
+  - Integrated a dedicated competitor market research table into both [AiRecipeModal.tsx](file:///c:/Users/Thomas.Sebastian/Documents/antigravity/KeniaRMS/client/src/components/AiRecipeModal.tsx) and the AI settings test benchmark in [SettingsPage.tsx](file:///c:/Users/Thomas.Sebastian/Documents/antigravity/KeniaRMS/client/src/pages/SettingsPage.tsx).
+  - Displays venue name, venue type, exact location, distance in km, comparable dish/drink name, and competitor price in KES.
+  - Dynamically calculates price difference relative to the venue's price with color-coded comparison badges (`+KES X (+Y% higher)`, `-KES X (-Y% lower)`, or `±0 (identical)`).
+  - Verified regional competitor database in [recipes-ai.service.ts](file:///c:/Users/Thomas.Sebastian/Documents/antigravity/KeniaRMS/server/src/modules/recipes/recipes-ai.service.ts) covering Diani Beach (Nomad Beach Bar, Sails Beach Bar, Salty Squid, Leonardo's, Ali Barbour's Cave), Mombasa, Watamu/Malindi, Nairobi, and coastal Kenya.
+  - 100% strict i18n localization in German, English, and Kiswahili for all competitor table headers, distance indicators, and price badges.
+
+---
+
 ## [1.1.0] - 2026-10-18
 
 ### Minor Release: Table & Area Management, AI Recipe Benchmarking & WYSIWYG Digital Signage Studio

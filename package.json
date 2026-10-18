@@ -1,0 +1,31 @@
+{
+  "name": "keniarms",
+  "version": "1.0.0",
+  "description": "KeniaRMS - Modern Restaurant Management, Waiter POS & Digital Signage System tailored for Kenya (KES, M-Pesa, 16% VAT, 2% Catering Levy)",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build:server": "npm run build --prefix server",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run build:server && npm run build:client"
+  },
+  "keywords": [
+    "pos",
+    "restaurant-management",
+    "kenya",
+    "mpesa",
+    "daraja-api",
+    "escpos-printer",
+    "react",
+    "typescript",
+    "sqlite",
+    "pwa"
+  ],
+  "author": "thomsenle",
+  "license": "MIT"
+}

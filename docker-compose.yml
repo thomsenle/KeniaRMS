@@ -1,0 +1,22 @@
+services:
+  kenia-rms-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: kenia_rms_server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+    volumes:
+      - kenia_rms_data:/app/data
+      - kenia_rms_uploads:/app/uploads
+
+volumes:
+  kenia_rms_data:
+    name: kenia_rms_data
+  kenia_rms_uploads:
+    name: kenia_rms_uploads

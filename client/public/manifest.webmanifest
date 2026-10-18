@@ -1,0 +1,50 @@
+{
+  "name": "KeniaRMS - Kellner POS",
+  "short_name": "Kellner POS",
+  "description": "Mobiles Kellner-Bestell- & Abrechnungsterminal für KeniaRMS",
+  "start_url": "/?mode=waiter",
+  "id": "/?mode=waiter",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c10",
+  "theme_color": "#12151c",
+  "lang": "de",
+  "categories": ["business", "food", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tische & Kasse",
+      "short_name": "Tische",
+      "description": "Bestellungen aufnehmen & abrechnen",
+      "url": "/?mode=waiter&tab=pos",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Geldbeutel & Schicht",
+      "short_name": "Kassensturz",
+      "description": "Kellner-Bargeldbestand & Trinkgeld",
+      "url": "/?mode=waiter&tab=shift",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

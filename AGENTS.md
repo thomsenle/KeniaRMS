@@ -19,6 +19,11 @@ KeniaRMS is designed to run reliably on local restaurant hardware (e.g., Mini-PC
 2. **Rezeptdatenbank (Recipe & Menu Module):**
    - Dishes, drinks, and combos with photos, descriptions, allergens, and cost calculations.
    - Exact mapping of recipes to stock ingredients for automatic inventory consumption.
+   - **KI-gestützte Rezeptgenerierung & Regionale Preisbildung:**
+     - Automatisches Erstellen von Speisen & Drinks per KI (Google Gemini mit Offline-Fallback auf die Kenia-Coast Gastronomie-Wissensdatenbank).
+     - Regionale Marktrecherche & Preis-Benchmark im Umkreis des konfigurierten Standorts (Standard: **Diani Beach**, einstellbar über Manager-Konfiguration).
+     - Ausweisung von Wareneinsatz (Food Cost in KES), Bruttomargen (%) und Konkurrenzpreis-Spanne (Budget, Durchschnitt, Beachfront).
+     - **Automatische Lager-Zutatenübernahme:** Beim Übernehmen eines generierten Rezepts werden alle noch nicht existierenden Zutaten automatisch in der Lagerverwaltung (`inventory_items`) angelegt, initial verbucht und mit dem Rezept verknüpft.
 3. **Kellner-Bestell- & Abrechnungsmodul (POS & Waiter Service):**
    - Interactive table map (rooms, outdoor/terrace, status indicators).
    - Table opening, closing, transfer, and flexible **bill splitting**.
@@ -32,10 +37,14 @@ KeniaRMS is designed to run reliably on local restaurant hardware (e.g., Mini-PC
      - Eingabe des Schicht-Grundstocks (*Starting Cash Float*).
      - Saubere Trennung von Bargeld-Bestand und bargeldlosen M-Pesa-Umsätzen.
      - Schichtabschluss (*Kassensturz*) mit Cent-genauer Abrechnung von Soll-Bargeld, Ist-Bargeld, Differenz und erarbeitetem Trinkgeld (*Tip*).
-4. **Display-Modul (Digital Signage):**
-   - Fullscreen digital menu board and advertising view (`/display/:screenId`) for TVs/monitors.
-   - Pulls active dishes, photos, and daily specials dynamically from the recipe database.
-   - Automatically hides items when critical ingredients are out of stock.
+4. **Display-Modul (Digital Signage & Bar-Bildschirme):**
+   - Fullscreen Digital Menu Board & TV-Signage (`/display` / `?mode=display&screen=:screenId`) für Bar-Bildschirme, Decken-TVs und Werbemonitore.
+   - **Interaktiver WYSIWYG-Editor (Signage Studio):**
+     - Visueller 16:9 Live-Canvas-Editor zur intuitiven Konfiguration von Anzeigebereichen (Zonen), Spaltenlayouts (1, 2, 3, 4 Spalten, Hero-Split) und Farbschemata (Midnight, Craft Slate, Emerald Lounge, Sunset Amber, High-Contrast Neon).
+     - Zonen-Einstellungen: Kategorie-Filter (Cocktails, Biere, Essen, Kaffee/Chai), Darstellungsstil (Klassische Bar-Preistafel mit gepunkteten Linien für maximale Fernlesbarkeit, Bildkarten-Raster, Hero-Promo-Slider, Kompakte Doppelspalte), Schriftgrößen-Skalierung (Normal, Groß, Extra-Groß für 65"+ Bar-TVs).
+     - Laufschrift / Ticker-Banner: Konfigurierbare Marquee-Laufschrift für Happy-Hour-Ankündigungen und Events.
+     - Multi-Screen-Fähigkeit: Mehrere dedizierte Bildschirme über der Bar parallel betreibbar (z.B. Screen 1: Cocktails & Beers, Screen 2: Nyama Choma & Food Specials, Screen 3: Full Bar Menu).
+   - Dynamische Datenanbindung an die Rezept- & Lagerdatenbank mit automatischer Ausblendung bzw. Kennzeichnung bei fehlenden Zutaten (Echtzeit-WebSocket-Synchronisation `display:updated`, `recipes:updated`, `inventory:updated_all`).
 5. **Universal Printer Module (ESC/POS):**
    - Universal network printing over TCP/IP (Port 9100) directly from backend to receipt printers.
    - Smart routing: Drinks $\rightarrow$ Bar printer, Food $\rightarrow$ Kitchen printer, Invoices $\rightarrow$ Guest receipt printer.
@@ -55,6 +64,7 @@ KeniaRMS is designed to run reliably on local restaurant hardware (e.g., Mini-PC
      - **Bondrucker-Netzwerk:** IP-Adressen, TCP/IP Ports (9100), Stationen (Küche, Bar, Kasse) und Testdruck.
      - **Mitarbeiter- & Rollenverwaltung:** Anlegen von Kellnern (`waiter`), Schichtleitern (`manager`) und Administratoren (`admin`) inklusive PIN-Vergabe.
      - **Finanzparameter:** 16% VAT, 2% Tourism/Catering Levy, Währung KES.
+     - **KI & Regionale Preis-Benchmark Konfiguration:** Einstellbarer Referenzstandort (Standard: **Diani Beach**), Prüfungsradius in km, Ziel-Bruttomarge in %, optionaler Google Gemini API-Key und interaktiver Preistest.
 8. **Personalplanung, Dienstplan & Zeiterfassung (Staff Scheduling & Hours Module):**
    - **Personalverwaltung & Mitarbeiter-Stammdaten:**
      - Umfassendes Mitarbeiterprofil: Name, Rolle (`waiter`, `kitchen`, `bar`, `manager`, `admin`), Abteilung, Safaricom-Telefonnummer (`07...`), E-Mail, Einstellungsdatum, Wochen-Sollstunden und individueller Stundenlohn in KES.

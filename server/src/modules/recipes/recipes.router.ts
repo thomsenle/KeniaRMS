@@ -28,6 +28,8 @@ const upload = multer({
 export const recipesRouter = Router();
 
 recipesRouter.get('/', RecipesController.getAll);
+recipesRouter.post('/ai-generate', RecipesController.generateAi);
+recipesRouter.post('/ai-import', RecipesController.importAiRecipe);
 recipesRouter.get('/:id', RecipesController.getById);
 recipesRouter.post('/', RecipesController.create);
 recipesRouter.put('/:id', RecipesController.update);

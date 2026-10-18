@@ -15,6 +15,7 @@ import { closingRouter } from './modules/closing/closing.router.js';
 import { displayRouter } from './modules/display/display.router.js';
 import { mpesaRouter } from './modules/mpesa/mpesa.router.js';
 import { staffRouter } from './modules/staff/staff.router.js';
+import { settingsRouter } from './modules/settings/settings.router.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -55,6 +56,7 @@ app.use('/api/closing', closingRouter);
 app.use('/api/display', displayRouter);
 app.use('/api/mpesa', mpesaRouter);
 app.use('/api/staff', staffRouter);
+app.use('/api/settings', settingsRouter);
 
 // WebSocket connection handling
 io.on('connection', (socket) => {

@@ -1,54 +1,215 @@
 import React, { useState, useEffect } from 'react';
-import { apiRequest, formatKES, socket } from '../api/client';
+import { apiRequest, socket } from '../api/client';
 import { useTranslation } from '../i18n';
-import { 
-  Tv, 
-  Maximize, 
-  Minimize, 
-  Wine, 
-  UtensilsCrossed, 
-  Star
-} from 'lucide-react';
+import { DisplayScreen, Recipe, Waiter } from '../types';
+import { DisplayScreenView } from '../components/DisplayScreenView';
+import { DisplayWYSIWYGEditor } from '../components/DisplayWYSIWYGEditor';
+import { Tv, Sliders, Maximize, Minimize, AlertCircle } from 'lucide-react';
 
-export const DisplayPage: React.FC = () => {
+interface DisplayPageProps {
+  activeWaiter?: Waiter | null;
+}
+
+export const DisplayPage: React.FC<DisplayPageProps> = ({ activeWaiter }) => {
   const { t } = useTranslation();
-  const [boardData, setBoardData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Query parameter detection: ?screen=screen_id & ?editor=true
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialScreenId = urlParams.get('screen') || 'screen_bar_1';
+  const initialEditorMode = urlParams.get('editor') === 'true';
+
+  const [screens, setScreens] = useState<DisplayScreen[]>([]);
+  const [activeScreenId, setActiveScreenId] = useState<string>(initialScreenId);
+  const [currentScreen, setCurrentScreen] = useState<DisplayScreen | null>(null);
+  const [allItems, setAllItems] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isEditorMode, setIsEditorMode] = useState<boolean>(initialEditorMode);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Manager/Admin permission to edit
+  const canEdit = !activeWaiter || activeWaiter.role === 'manager' || activeWaiter.role === 'admin';
 
   useEffect(() => {
-    loadBoardData();
+    loadAllScreensAndBoard();
 
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    // Sockets for live digital signage sync across physical TVs & devices
+    const handleDisplayUpdate = () => {
+      loadAllScreensAndBoard();
+    };
 
-    socket.on('recipes:updated', loadBoardData);
-    socket.on('inventory:updated_all', loadBoardData);
+    socket.on('display:updated', handleDisplayUpdate);
+    socket.on('recipes:updated', loadAllScreensAndBoard);
+    socket.on('inventory:updated_all', loadAllScreensAndBoard);
 
     return () => {
-      clearInterval(timer);
-      socket.off('recipes:updated');
-      socket.off('inventory:updated_all');
+      socket.off('display:updated', handleDisplayUpdate);
+      socket.off('recipes:updated', loadAllScreensAndBoard);
+      socket.off('inventory:updated_all', loadAllScreensAndBoard);
     };
-  }, []);
+  }, [activeScreenId]);
 
-  useEffect(() => {
-    if (!boardData?.specials || boardData.specials.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentSlideIndex(prev => (prev + 1) % boardData.specials.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [boardData]);
-
-  const loadBoardData = async () => {
+  const loadAllScreensAndBoard = async () => {
     try {
-      const res = await apiRequest<{ success: boolean } & any>('/display/menu-board');
-      setBoardData(res);
-    } catch (err: any) {
-      console.error('Failed to load menu board:', err);
+      // 1. Fetch all configured screens
+      const screensRes = await apiRequest<{ success: boolean; screens: DisplayScreen[] }>('/display/screens');
+      const loadedScreens = screensRes.screens || [];
+      setScreens(loadedScreens);
+
+      // Determine target screen ID
+      const targetId = activeScreenId && loadedScreens.some(s => s.id === activeScreenId)
+        ? activeScreenId
+        : (loadedScreens[0]?.id || 'screen_bar_1');
+
+      if (targetId !== activeScreenId) {
+        setActiveScreenId(targetId);
+      }
+
+      // 2. Fetch specific screen with resolved zone items
+      const boardRes = await apiRequest<{
+        success: boolean;
+        screen: DisplayScreen;
+        allItems?: Recipe[];
+      }>(`/display/screens/${targetId}`);
+
+      if (boardRes.screen) {
+        setCurrentScreen(boardRes.screen);
+      }
+      if (boardRes.allItems) {
+        setAllItems(boardRes.allItems);
+      }
+    } catch (err) {
+      console.error('Failed to load display screens:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectScreen = (screenId: string) => {
+    setActiveScreenId(screenId);
+    // Update URL query param without full page reload
+    const url = new URL(window.location.href);
+    url.searchParams.set('screen', screenId);
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  const handleSaveScreen = async (updatedScreen: DisplayScreen) => {
+    try {
+      const res = await apiRequest<{ success: boolean; screen: DisplayScreen }>(
+        `/display/screens/${updatedScreen.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updatedScreen)
+        }
+      );
+
+      if (res.success && res.screen) {
+        setCurrentScreen(res.screen);
+        setScreens(prev => prev.map(s => s.id === res.screen.id ? res.screen : s));
+      }
+    } catch (err) {
+      console.error('Failed to save screen layout:', err);
+      alert('Error saving screen: ' + (err as any).message);
+    }
+  };
+
+  const handleCreateScreen = async () => {
+    try {
+      const newScreenName = `Bar Screen ${screens.length + 1}`;
+      const res = await apiRequest<{ success: boolean; screen: DisplayScreen }>(
+        '/display/screens',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: newScreenName,
+            title: 'SAVANNAH BAR & LOUNGE',
+            subtitle: 'Craft Cocktails & Ice-Cold Brews • Nairobi',
+            theme: 'midnight',
+            font_size: 'large',
+            layout_type: '3_columns',
+            ticker_enabled: 1,
+            ticker_text: 'Karibu Savannah Lounge • 16% VAT & 2% Catering Levy Included',
+            zones: [
+              {
+                id: 'z_cocktails',
+                title: 'Signature Cocktails',
+                icon: 'cocktail',
+                categories: ['cocktails'],
+                station: 'bar',
+                style: 'classic_list',
+                show_images: true,
+                show_descriptions: true,
+                show_prices: true,
+                show_badges: true,
+                max_items: 8,
+                sort_by: 'highlight_first'
+              },
+              {
+                id: 'z_beers',
+                title: 'Beers & Ciders',
+                icon: 'beer',
+                categories: ['drinks'],
+                station: 'bar',
+                style: 'classic_list',
+                show_images: true,
+                show_descriptions: false,
+                show_prices: true,
+                show_badges: true,
+                max_items: 8,
+                sort_by: 'highlight_first'
+              },
+              {
+                id: 'z_food',
+                title: 'Bar Food & Bites',
+                icon: 'food',
+                categories: ['food'],
+                station: 'kitchen',
+                style: 'classic_list',
+                show_images: true,
+                show_descriptions: true,
+                show_prices: true,
+                show_badges: true,
+                max_items: 8,
+                sort_by: 'highlight_first'
+              }
+            ]
+          })
+        }
+      );
+
+      if (res.success && res.screen) {
+        setScreens(prev => [...prev, res.screen]);
+        handleSelectScreen(res.screen.id);
+      }
+    } catch (err) {
+      console.error('Failed to create new display screen:', err);
+    }
+  };
+
+  const handleDeleteScreen = async (screenId: string) => {
+    if (screens.length <= 1) return;
+    if (confirm(t('display.delete_screen_confirm'))) {
+      try {
+        await apiRequest(`/display/screens/${screenId}`, { method: 'DELETE' });
+        const remaining = screens.filter(s => s.id !== screenId);
+        setScreens(remaining);
+        if (remaining.length > 0) {
+          handleSelectScreen(remaining[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to delete screen:', err);
+      }
+    }
+  };
+
+  const handleResetDefaults = async () => {
+    if (confirm(t('display.reset_confirm'))) {
+      try {
+        await apiRequest('/display/screens/reset', { method: 'POST' });
+        await loadAllScreensAndBoard();
+        alert(t('display.reset_success'));
+      } catch (err) {
+        console.error('Failed to reset screens:', err);
+      }
     }
   };
 
@@ -66,243 +227,144 @@ export const DisplayPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', color: 'var(--text-muted)' }}>
-        <Tv size={48} style={{ animation: 'pulse 1.5s infinite' }} />
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '80vh',
+        color: 'var(--text-muted)',
+        gap: '16px'
+      }}>
+        <Tv size={56} style={{ animation: 'pulse 1.5s infinite', color: 'var(--primary)' }} />
+        <div style={{ fontWeight: 700, letterSpacing: '0.04em' }}>{t('common.loading')}</div>
       </div>
     );
   }
 
-  const specials = boardData?.specials || [];
-  const currentSpecial = specials[currentSlideIndex] || specials[0];
-  const categories = boardData?.categories || {};
+  // RENDER WYSIWYG EDITOR MODE
+  if (isEditorMode) {
+    return (
+      <DisplayWYSIWYGEditor
+        screens={screens}
+        activeScreenId={activeScreenId}
+        allItems={allItems}
+        onSelectScreen={handleSelectScreen}
+        onSaveScreen={handleSaveScreen}
+        onCreateScreen={handleCreateScreen}
+        onDeleteScreen={handleDeleteScreen}
+        onResetDefaults={handleResetDefaults}
+        onExitEditor={() => {
+          setIsEditorMode(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('editor');
+          window.history.replaceState({}, '', url.toString());
+        }}
+      />
+    );
+  }
+
+  // RENDER PURE DIGITAL SIGNAGE / TV VIEW MODE
+  if (!currentScreen) {
+    return (
+      <div style={{
+        padding: '40px',
+        textAlign: 'center',
+        color: 'var(--text-muted)'
+      }}>
+        <AlertCircle size={48} style={{ marginBottom: '16px', color: 'var(--primary)' }} />
+        <h2>{t('display.no_items_in_zone')}</h2>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      background: 'radial-gradient(ellipse at top, #1a1e28 0%, #0a0c10 100%)', 
-      color: '#fff', 
-      padding: '24px',
-      margin: '-20px',
-      overflowX: 'hidden'
-    }}>
-      {/* Top Banner / TV Screen Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#0d1117',
-            fontWeight: 900,
-            fontSize: '1.6rem'
-          }}>
-            K
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.8rem', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-              {boardData?.restaurantName || 'The Savannah Bistro & Lounge'}
-            </h1>
-            <span style={{ fontSize: '0.85rem', color: 'var(--primary)', letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
-              {t('display.header_sub')} • {boardData?.location || 'Nairobi, Kenya'}
-            </span>
-          </div>
-        </div>
+    <div style={{ position: 'relative', width: '100%', minHeight: '100vh', margin: '-20px' }}>
+      {/* Subtle Floating TV Bar for Switching Screen & Fullscreen */}
+      <div style={{
+        position: 'fixed',
+        top: '12px',
+        right: '16px',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        background: 'rgba(10, 12, 16, 0.85)',
+        backdropFilter: 'blur(12px)',
+        padding: '6px 10px',
+        borderRadius: '12px',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+      }}>
+        {/* Quick Screen Switcher Dropdown */}
+        {screens.length > 1 && (
+          <select
+            className="input"
+            value={activeScreenId}
+            onChange={(e) => handleSelectScreen(e.target.value)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              color: '#fff',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            {screens.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name || s.title}
+              </option>
+            ))}
+          </select>
+        )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'monospace', color: '#f3f4f6' }}>
-              {currentTime.toLocaleTimeString('en-GB')}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {currentTime.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </div>
-          </div>
-
+        {/* Enter WYSIWYG Editor Button */}
+        {canEdit && (
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={toggleFullscreen}
-            style={{ padding: '8px 12px' }}
+            onClick={() => setIsEditorMode(true)}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              background: 'rgba(245, 158, 11, 0.15)',
+              borderColor: 'rgba(245, 158, 11, 0.35)',
+              color: 'var(--primary)'
+            }}
           >
-            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+            <Sliders size={15} />
+            <span>{t('display.edit_wysiwyg')}</span>
           </button>
-        </div>
-      </div>
+        )}
 
-      {/* HERO SECTION: ROTATING CHEF'S SPECIAL */}
-      {currentSpecial && (
-        <div 
-          className="glass-panel-elevated"
-          style={{
-            position: 'relative',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            marginBottom: '32px',
-            minHeight: '280px',
-            display: 'flex',
-            alignItems: 'center',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
-            border: '1px solid rgba(245, 158, 11, 0.3)'
-          }}
+        {/* Fullscreen Toggle */}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? t('display.view_tv') : t('display.view_tv')}
+          style={{ padding: '6px 10px' }}
         >
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${currentSpecial.image_url})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            opacity: 0.35,
-            filter: 'blur(2px)'
-          }} />
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to right, rgba(10, 12, 16, 0.95) 40%, rgba(10, 12, 16, 0.6) 100%)'
-          }} />
-
-          {/* Slide Content */}
-          <div style={{ position: 'relative', zIndex: 2, padding: '32px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '30px' }}>
-            <div style={{ maxWidth: '650px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.5)', padding: '4px 12px', borderRadius: 'var(--radius-full)', color: '#fbbf24', fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px' }}>
-                <Star size={14} fill="#fbbf24" /> {t('display.chefs_highlight')}
-              </div>
-
-              <h2 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '10px', color: '#fff' }}>
-                {currentSpecial.name}
-              </h2>
-
-              <p style={{ fontSize: '1.05rem', color: '#d1d5db', lineHeight: 1.5, marginBottom: '20px' }}>
-                {currentSpecial.description || t('display.fresh_served')}
-              </p>
-
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                <span style={{ fontSize: '2.4rem', fontWeight: 900, color: 'var(--primary)' }}>
-                  {formatKES(currentSpecial.price)}
-                </span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  {t('display.vat_levy_included')}
-                </span>
-              </div>
-            </div>
-
-            {/* Dish Photo Card */}
-            {currentSpecial.image_url && (
-              <div style={{
-                width: '320px',
-                height: '210px',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                boxShadow: '0 12px 30px rgba(0,0,0,0.8)',
-                border: '2px solid rgba(255,255,255,0.15)',
-                flexShrink: 0
-              }}>
-                <img
-                  src={currentSpecial.image_url}
-                  alt={currentSpecial.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Dots Indicator */}
-          {specials.length > 1 && (
-            <div style={{ position: 'absolute', bottom: '12px', left: '40px', display: 'flex', gap: '8px', zIndex: 3 }}>
-              {specials.map((_: any, idx: number) => (
-                <div
-                  key={idx}
-                  onClick={() => setCurrentSlideIndex(idx)}
-                  style={{
-                    width: idx === currentSlideIndex ? '28px' : '8px',
-                    height: '8px',
-                    borderRadius: '4px',
-                    background: idx === currentSlideIndex ? 'var(--primary)' : 'rgba(255,255,255,0.3)',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* CATEGORY GRIDS */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-        {Object.entries(categories).map(([categoryName, catItems]: [string, any]) => (
-          <div key={categoryName}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
-              {categoryName === 'drinks' || categoryName === 'cocktails' ? (
-                <Wine size={24} color="var(--primary)" />
-              ) : (
-                <UtensilsCrossed size={24} color="var(--primary)" />
-              )}
-              <h2 style={{ fontSize: '1.6rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {categoryName}
-              </h2>
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '18px'
-            }}>
-              {catItems.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="glass-panel"
-                  style={{
-                    padding: '16px',
-                    display: 'flex',
-                    gap: '14px',
-                    alignItems: 'center',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    background: 'rgba(22, 27, 34, 0.6)'
-                  }}
-                >
-                  <div style={{
-                    width: '76px',
-                    height: '76px',
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    background: '#161b22',
-                    flexShrink: 0
-                  }}>
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)' }}>
-                        {item.station === 'bar' ? <Wine size={28} /> : <UtensilsCrossed size={28} />}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {item.name}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', lineClamp: 1, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {item.description || t('display.fresh_served')}
-                    </div>
-                    <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--primary)' }}>
-                      {formatKES(item.price)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+          {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+        </button>
       </div>
+
+      {/* Main Full-Size TV Digital Signage View */}
+      <DisplayScreenView
+        screen={currentScreen}
+        allItems={allItems}
+        isInteractive={false}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onOpenEditor={() => setIsEditorMode(true)}
+        canEdit={canEdit}
+      />
     </div>
   );
 };
+
+export default DisplayPage;

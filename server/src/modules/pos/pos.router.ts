@@ -3,9 +3,19 @@ import { POSController } from './pos.controller.js';
 
 export const posRouter = Router();
 
+// Table Management
 posRouter.get('/tables', POSController.getTables);
+posRouter.post('/tables', POSController.createTable);
+posRouter.put('/tables/:tableId', POSController.updateTable);
+posRouter.delete('/tables/:tableId', POSController.deleteTable);
 posRouter.post('/tables/:tableId/open', POSController.openTable);
 posRouter.get('/orders/table/:tableId', POSController.getOrder);
+
+// Dining Areas Management
+posRouter.get('/areas', POSController.getAreas);
+posRouter.post('/areas', POSController.createArea);
+posRouter.put('/areas/:areaId', POSController.updateArea);
+posRouter.delete('/areas/:areaId', POSController.deleteArea);
 
 posRouter.post('/orders/:orderId/items', POSController.addItemToCart);
 posRouter.put('/orders/items/:itemId', POSController.updateCartItem);

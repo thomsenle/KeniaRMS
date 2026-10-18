@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '../../data');
 if (!fs.existsSync(dataDir)) {
@@ -100,6 +101,14 @@ export function initDatabase() {
       FOREIGN KEY (inventory_item_id) REFERENCES inventory_items(id) ON DELETE RESTRICT
     );
 
+    -- Restaurant Areas (Manager-configurable dining areas)
+    CREATE TABLE IF NOT EXISTS restaurant_areas (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- Tables
     CREATE TABLE IF NOT EXISTS tables (
       id TEXT PRIMARY KEY,
@@ -109,6 +118,7 @@ export function initDatabase() {
       status TEXT NOT NULL DEFAULT 'free',
       active_waiter_id TEXT,
       guests_count INTEGER NOT NULL DEFAULT 1,
+      is_active INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (active_waiter_id) REFERENCES waiters(id)
     );
 
@@ -271,6 +281,31 @@ export function initDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (staff_id) REFERENCES waiters(id) ON DELETE CASCADE
     );
+
+    -- Application & AI Pricing Settings
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Digital Signage & Bar Display Screens (WYSIWYG Screen Builder)
+    CREATE TABLE IF NOT EXISTS display_screens (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      title TEXT NOT NULL,
+      subtitle TEXT,
+      theme TEXT NOT NULL DEFAULT 'midnight',
+      font_size TEXT NOT NULL DEFAULT 'large',
+      layout_type TEXT NOT NULL DEFAULT '3_columns',
+      zones_json TEXT NOT NULL,
+      ticker_enabled INTEGER NOT NULL DEFAULT 1,
+      ticker_text TEXT,
+      ticker_speed TEXT NOT NULL DEFAULT 'normal',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Ensure waiters has full employee management columns
@@ -317,6 +352,36 @@ export function initDatabase() {
     // Ignore migration error if already exists
   }
 
+  // Ensure tables has is_active column
+  try {
+    const tableCols = db.prepare(`PRAGMA table_info(tables)`).all() as any[];
+    if (!tableCols.some(c => c.name === 'is_active')) {
+      db.prepare(`ALTER TABLE tables ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1`).run();
+    }
+  } catch (err) {
+    // Ignore migration error
+  }
+
+  // Ensure restaurant_areas exists and default areas are seeded
+  try {
+    const areaCount = (db.prepare('SELECT COUNT(*) as count FROM restaurant_areas').get() as any)?.count || 0;
+    if (areaCount === 0) {
+      const distinctAreas = db.prepare('SELECT DISTINCT area FROM tables WHERE area IS NOT NULL').all() as any[];
+      const standardAreas = ['Restaurant', 'Terrace & Garden', 'Bar', 'VIP'];
+      const allToSeed = Array.from(new Set([...standardAreas, ...distinctAreas.map(d => d.area).filter(Boolean)]));
+
+      let order = 1;
+      for (const areaName of allToSeed) {
+        db.prepare(`
+          INSERT OR IGNORE INTO restaurant_areas (id, name, display_order)
+          VALUES (?, ?, ?)
+        `).run(uuidv4(), areaName, order++);
+      }
+    }
+  } catch (err) {
+    // Ignore migration error
+  }
+
   // Ensure default mpesa_settings entry exists
   try {
     const mpesaCount = (db.prepare(`SELECT COUNT(*) as count FROM mpesa_settings`).get() as any)?.count || 0;
@@ -326,6 +391,20 @@ export function initDatabase() {
         VALUES ('mpesa_default', 'till', '174379', '543210', 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919', 'sandbox')
       `).run();
     }
+  } catch (err) {
+    // Ignore
+  }
+
+  // Ensure default app_settings entries exist
+  try {
+    const insertSetting = db.prepare(`
+      INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)
+    `);
+    insertSetting.run('pricing_location', 'Diani Beach');
+    insertSetting.run('pricing_radius_km', '15');
+    insertSetting.run('pricing_target_margin', '70');
+    insertSetting.run('ai_gemini_api_key', '');
+    insertSetting.run('ai_provider', 'gemini');
   } catch (err) {
     // Ignore
   }
@@ -441,6 +520,213 @@ export function initDatabase() {
     }
   } catch (err) {
     console.warn('Staff seeding note:', err);
+  }
+
+  // Seed default display screens for bar digital signage
+  try {
+    const screenCount = (db.prepare('SELECT COUNT(*) as count FROM display_screens').get() as any)?.count || 0;
+    if (screenCount === 0) {
+      const insertScreen = db.prepare(`
+        INSERT INTO display_screens (id, name, title, subtitle, theme, font_size, layout_type, zones_json, ticker_enabled, ticker_text, ticker_speed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      // Screen 1: Cocktails & Cold Beers (3 Columns)
+      const screen1Zones = [
+        {
+          id: 'zone_cocktails',
+          title: 'Signature Cocktails',
+          icon: 'cocktail',
+          categories: ['cocktails'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: true,
+          show_prices: true,
+          show_badges: true,
+          max_items: 8,
+          sort_by: 'highlight_first'
+        },
+        {
+          id: 'zone_beers',
+          title: 'Cold Beers & Ciders',
+          icon: 'beer',
+          categories: ['drinks'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 8,
+          sort_by: 'highlight_first'
+        },
+        {
+          id: 'zone_hot',
+          title: 'Chai & Specialty Coffee',
+          icon: 'coffee',
+          categories: ['coffee'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: true,
+          show_prices: true,
+          show_badges: true,
+          max_items: 8,
+          sort_by: 'highlight_first'
+        }
+      ];
+
+      insertScreen.run(
+        'screen_bar_1',
+        'Bar Screen 1: Cocktails & Cold Beers',
+        'SAVANNAH BAR & CRAFT COCKTAILS',
+        'Handcrafted Cocktails • Ice-Cold Brews • Nairobi',
+        'midnight',
+        'large',
+        '3_columns',
+        JSON.stringify(screen1Zones),
+        1,
+        '🍹 Happy Hour täglich 17:00–19:00 Uhr: 20% Rabatt auf alle Signature Cocktails! 🍻 Eiskaltes Tusker & White Cap vom Fass 🎵 Live Acoustic Band jeden Freitag ab 19:30 Uhr!',
+        'normal'
+      );
+
+      // Screen 2: Nyama Choma & Food Specials (Hero Split 38% / 62%)
+      const screen2Zones = [
+        {
+          id: 'zone_specials_hero',
+          title: "Chef's Daily Highlight",
+          icon: 'star',
+          categories: [],
+          station: 'all',
+          style: 'hero_slider',
+          show_images: true,
+          show_descriptions: true,
+          show_prices: true,
+          show_badges: true,
+          max_items: 4,
+          sort_by: 'highlight_first'
+        },
+        {
+          id: 'zone_mains',
+          title: 'Nyama Choma & Grill Mains',
+          icon: 'food',
+          categories: ['food'],
+          station: 'kitchen',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: true,
+          show_prices: true,
+          show_badges: true,
+          max_items: 6,
+          sort_by: 'highlight_first'
+        },
+        {
+          id: 'zone_bites',
+          title: 'Bar Snacks & Tapas',
+          icon: 'food',
+          categories: ['food'],
+          station: 'kitchen',
+          style: 'cards',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 6,
+          sort_by: 'highlight_first'
+        }
+      ];
+
+      insertScreen.run(
+        'screen_bar_2',
+        'Bar Screen 2: Nyama Choma & Food Specials',
+        'SAVANNAH GRILL & BAR BITES',
+        'Fire-Roasted Nyama • Farm-Fresh Ingredients',
+        'amber',
+        'large',
+        'hero_split',
+        JSON.stringify(screen2Zones),
+        1,
+        '🔥 Frisch gegrilltes Prime Mbuzi Nyama Choma mit Kachumbari-Salat & scharfem Pili-Pili Dip • Karibu Chakula!',
+        'normal'
+      );
+
+      // Screen 3: Full 4-Panel Drinks Board
+      const screen3Zones = [
+        {
+          id: 'zone_cocktails_full',
+          title: 'Cocktails & Dawa',
+          icon: 'cocktail',
+          categories: ['cocktails'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 10,
+          sort_by: 'name_asc'
+        },
+        {
+          id: 'zone_beers_full',
+          title: 'Cold Beers & Ciders',
+          icon: 'beer',
+          categories: ['drinks'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 10,
+          sort_by: 'name_asc'
+        },
+        {
+          id: 'zone_coffee_full',
+          title: 'Coffee & Teas',
+          icon: 'coffee',
+          categories: ['coffee'],
+          station: 'bar',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 10,
+          sort_by: 'name_asc'
+        },
+        {
+          id: 'zone_food_full',
+          title: 'Bar Bites & Snacks',
+          icon: 'food',
+          categories: ['food'],
+          station: 'kitchen',
+          style: 'classic_list',
+          show_images: true,
+          show_descriptions: false,
+          show_prices: true,
+          show_badges: true,
+          max_items: 10,
+          sort_by: 'name_asc'
+        }
+      ];
+
+      insertScreen.run(
+        'screen_bar_3',
+        'Bar Screen 3: Full 4-Panel Drinks Board',
+        'THE SAVANNAH DRINKS & LOUNGE',
+        'Full Spirits, Wines & Cold Brews Menu',
+        'slate',
+        'normal',
+        '4_columns',
+        JSON.stringify(screen3Zones),
+        1,
+        'Karibu The Savannah Lounge • Alle Preise verstehen sich inklusive 16% VAT & 2% Catering Levy • Zahlung bequem bar oder mit M-Pesa',
+        'normal'
+      );
+    }
+  } catch (err) {
+    console.warn('Display screens seeding note:', err);
   }
 
   console.log('Database initialized successfully at:', dbPath);

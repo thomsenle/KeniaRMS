@@ -251,6 +251,52 @@ input:focus, select:focus, textarea:focus {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Data Table Styles */
+.data-table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  background: var(--bg-surface-elevated);
+  padding: 12px 14px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 /* Layout Utilities */
 .app-container {
   display: flex;
@@ -562,4 +608,154 @@ input:focus, select:focus, textarea:focus {
     padding: 0 !important;
     max-width: 100% !important;
   }
+}
+
+/* ==========================================================================
+   DIGITAL SIGNAGE & BAR DISPLAY SCREENS (WYSIWYG SCREEN BUILDER)
+   ========================================================================== */
+
+/* Theme Palettes for Bar Displays */
+.display-theme-midnight {
+  --display-bg: radial-gradient(ellipse at 50% 0%, #161c28 0%, #080a0f 100%);
+  --display-card-bg: rgba(22, 28, 42, 0.7);
+  --display-card-border: rgba(245, 158, 11, 0.2);
+  --display-accent: #f59e0b;
+  --display-accent-glow: rgba(245, 158, 11, 0.35);
+  --display-text: #f9fafb;
+  --display-muted: #9ca3af;
+  --display-dots: rgba(245, 158, 11, 0.3);
+}
+
+.display-theme-slate {
+  --display-bg: radial-gradient(ellipse at 50% 0%, #1e2430 0%, #0d1117 100%);
+  --display-card-bg: rgba(30, 36, 48, 0.75);
+  --display-card-border: rgba(56, 189, 248, 0.2);
+  --display-accent: #38bdf8;
+  --display-accent-glow: rgba(56, 189, 248, 0.35);
+  --display-text: #ffffff;
+  --display-muted: #cbd5e1;
+  --display-dots: rgba(203, 213, 225, 0.3);
+}
+
+.display-theme-emerald {
+  --display-bg: radial-gradient(ellipse at 50% 0%, #0d281e 0%, #04100c 100%);
+  --display-card-bg: rgba(13, 40, 30, 0.75);
+  --display-card-border: rgba(52, 211, 153, 0.25);
+  --display-accent: #34d399;
+  --display-accent-glow: rgba(52, 211, 153, 0.35);
+  --display-text: #f0fdf4;
+  --display-muted: #a7f3d0;
+  --display-dots: rgba(52, 211, 153, 0.3);
+}
+
+.display-theme-amber {
+  --display-bg: radial-gradient(ellipse at 50% 0%, #2b170c 0%, #0f0703 100%);
+  --display-card-bg: rgba(43, 23, 12, 0.75);
+  --display-card-border: rgba(251, 146, 60, 0.25);
+  --display-accent: #fb923c;
+  --display-accent-glow: rgba(251, 146, 60, 0.35);
+  --display-text: #fff7ed;
+  --display-muted: #fed7aa;
+  --display-dots: rgba(251, 146, 60, 0.3);
+}
+
+.display-theme-neon {
+  --display-bg: radial-gradient(ellipse at 50% 0%, #0f172a 0%, #020617 100%);
+  --display-card-bg: rgba(15, 23, 42, 0.85);
+  --display-card-border: rgba(6, 182, 212, 0.35);
+  --display-accent: #06b6d4;
+  --display-accent-glow: rgba(6, 182, 212, 0.45);
+  --display-text: #ffffff;
+  --display-muted: #94a3b8;
+  --display-dots: rgba(6, 182, 212, 0.35);
+}
+
+/* Typography Font Scales for Distance Viewing */
+.display-font-normal {
+  --display-header-size: 1.8rem;
+  --display-zone-title-size: 1.35rem;
+  --display-item-name-size: 1.05rem;
+  --display-item-desc-size: 0.8rem;
+  --display-price-size: 1.25rem;
+}
+
+.display-font-large {
+  --display-header-size: 2.2rem;
+  --display-zone-title-size: 1.6rem;
+  --display-item-name-size: 1.22rem;
+  --display-item-desc-size: 0.88rem;
+  --display-price-size: 1.5rem;
+}
+
+.display-font-xlarge {
+  --display-header-size: 2.6rem;
+  --display-zone-title-size: 1.85rem;
+  --display-item-name-size: 1.38rem;
+  --display-item-desc-size: 0.95rem;
+  --display-price-size: 1.75rem;
+}
+
+/* Bar Item Classic Price Line (Leader Dots) */
+.bar-price-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
+.bar-price-dots {
+  flex: 1;
+  border-bottom: 2px dotted var(--display-dots);
+  margin: 0 4px;
+  min-width: 12px;
+  transform: translateY(-4px);
+}
+
+/* Ticker Marquee Animations */
+@keyframes marqueeScroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.ticker-marquee-track {
+  display: inline-block;
+  white-space: nowrap;
+  animation-name: marqueeScroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.ticker-speed-slow {
+  animation-duration: 38s;
+}
+
+.ticker-speed-normal {
+  animation-duration: 24s;
+}
+
+.ticker-speed-fast {
+  animation-duration: 15s;
+}
+
+/* WYSIWYG Live Canvas & Zone Selection */
+.wysiwyg-zone-box {
+  position: relative;
+  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+}
+
+.wysiwyg-zone-box.interactive-mode {
+  cursor: pointer;
+}
+
+.wysiwyg-zone-box.interactive-mode:hover {
+  outline: 2px dashed rgba(245, 158, 11, 0.6);
+  outline-offset: 4px;
+}
+
+.wysiwyg-zone-box.selected-zone {
+  outline: 3px solid var(--primary) !important;
+  outline-offset: 4px;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
 }

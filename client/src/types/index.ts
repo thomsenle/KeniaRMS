@@ -74,6 +74,14 @@ export interface Recipe {
   ingredients?: RecipeIngredient[];
 }
 
+export interface RestaurantArea {
+  id: string;
+  name: string;
+  display_order?: number;
+  tables_count?: number;
+  created_at?: string;
+}
+
 export interface Table {
   id: string;
   table_number: number;
@@ -86,6 +94,7 @@ export interface Table {
   order_status?: string;
   order_total_gross?: number;
   guests_count: number;
+  is_active?: number;
 }
 
 export interface OrderItem {
@@ -236,5 +245,90 @@ export interface StaffHoursSummary {
   total_wage: number;
   shift_count: number;
   scheduled_shift_count: number;
+}
+
+export type DisplayTheme = 'midnight' | 'slate' | 'emerald' | 'amber' | 'neon';
+export type DisplayFontSize = 'normal' | 'large' | 'xlarge';
+export type DisplayLayoutType = '1_column' | '2_columns' | '3_columns' | '4_columns' | 'hero_split';
+export type DisplayZoneStyle = 'classic_list' | 'cards' | 'hero_slider' | 'compact_split';
+
+export interface DisplayZone {
+  id: string;
+  title: string;
+  icon?: string;
+  categories: string[];
+  station?: 'all' | 'bar' | 'kitchen';
+  style: DisplayZoneStyle;
+  show_images: boolean;
+  show_descriptions: boolean;
+  show_prices: boolean;
+  show_badges: boolean;
+  max_items: number;
+  sort_by: 'highlight_first' | 'price_asc' | 'price_desc' | 'name_asc';
+  items?: Recipe[];
+}
+
+export interface DisplayScreen {
+  id: string;
+  name: string;
+  title: string;
+  subtitle?: string;
+  theme: DisplayTheme;
+  font_size: DisplayFontSize;
+  layout_type: DisplayLayoutType;
+  zones: DisplayZone[];
+  ticker_enabled: boolean | number;
+  ticker_text?: string;
+  ticker_speed?: 'slow' | 'normal' | 'fast';
+  is_active?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AiMarketBenchmark {
+  location: string;
+  radius_km: number;
+  min_price: number;
+  avg_price: number;
+  max_price: number;
+  food_cost_kes: number;
+  gross_margin_percent: number;
+  rationale: string;
+}
+
+export interface AiGeneratedIngredient {
+  name: string;
+  category: 'meat' | 'ingredient' | 'dairy' | 'produce' | 'dry_goods' | 'beverage' | 'consumables';
+  quantity: number;
+  unit: string;
+  cost_per_unit: number;
+  portion_cost_kes: number;
+  min_stock?: number;
+  optimal_stock?: number;
+  initial_stock?: number;
+  supplier?: string;
+}
+
+export interface AiGeneratedDish {
+  name: string;
+  category: 'food' | 'drinks' | 'dessert' | 'special' | 'cocktails' | 'coffee';
+  station: 'kitchen' | 'bar' | 'counter';
+  description: string;
+  suggested_price: number;
+  tax_rate: number;
+  catering_levy: number;
+  display_on_board: number;
+  display_highlight: number;
+  market_benchmark: AiMarketBenchmark;
+  ingredients: AiGeneratedIngredient[];
+}
+
+export interface AppSettings {
+  pricing_location: string;
+  pricing_radius_km: number;
+  pricing_target_margin: number;
+  has_gemini_key: boolean;
+  gemini_key_masked?: string;
+  ai_provider: string;
 }
 

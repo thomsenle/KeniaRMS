@@ -20,7 +20,13 @@ import { LayoutGrid, Wallet } from 'lucide-react';
 
 export const App: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<string>('pos');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'display' || window.location.pathname.startsWith('/display')) {
+      return 'display';
+    }
+    return 'pos';
+  });
   const [activeWaiter, setActiveWaiter] = useState<Waiter | null>(null);
   const [activeShift, setActiveShift] = useState<WaiterShift | null>(null);
 
@@ -80,10 +86,10 @@ export const App: React.FC = () => {
   }, []);
 
   // Strict Role-Based Access Control:
-  // Waiters (role === 'waiter') are strictly confined to POS (Bestellen & Abrechnen) and Shift (Ein-/Ausstempeln & Kasse)
+  // Waiters (role === 'waiter') are strictly confined to POS and Shift, while Display can be viewed on TVs
   useEffect(() => {
     if (activeWaiter && activeWaiter.role === 'waiter') {
-      if (activeTab !== 'pos' && activeTab !== 'shift') {
+      if (activeTab !== 'pos' && activeTab !== 'shift' && activeTab !== 'display') {
         setActiveTab('pos');
       }
     }
@@ -119,12 +125,14 @@ export const App: React.FC = () => {
   const handleLoginSuccess = (waiter: Waiter, shift: WaiterShift | null) => {
     setActiveWaiter(waiter);
     setActiveShift(shift);
-    // If the logging in user is a waiter, automatically switch to Waiter Mode
+    // If the logging in user is a waiter, automatically switch to Waiter Mode; otherwise exit Waiter Mode
     if (waiter.role === 'waiter') {
       setIsWaiterMode(true);
       if (activeTab !== 'pos' && activeTab !== 'shift') {
         setActiveTab('pos');
       }
+    } else {
+      setIsWaiterMode(false);
     }
   };
 
@@ -182,7 +190,7 @@ export const App: React.FC = () => {
           onTriggerInstall={handleTriggerInstall}
         />
       ) : (
-        <div style={{ position: 'fixed', top: '12px', right: '12px', zIndex: 100 }}>
+        <div style={{ position: 'fixed', top: '12px', left: '16px', zIndex: 100 }}>
           <button
             className="btn btn-secondary"
             onClick={() => setActiveTab('pos')}
@@ -215,6 +223,9 @@ export const App: React.FC = () => {
           />
         )}
         
+        {/* TV Digital Signage Display Mode (Accessible on TV displays & Manager mode) */}
+        {activeTab === 'display' && <DisplayPage activeWaiter={activeWaiter} />}
+
         {/* Modules restricted to Manager / Admin ONLY */}
         {!isStandardWaiter && !isWaiterMode && (
           <>
@@ -222,7 +233,6 @@ export const App: React.FC = () => {
             {activeTab === 'recipes' && <RecipesPage />}
             {activeTab === 'closing' && <ClosingPage />}
             {activeTab === 'staff' && <StaffPage activeWaiter={activeWaiter} />}
-            {activeTab === 'display' && <DisplayPage />}
             {activeTab === 'settings' && <SettingsPage activeWaiter={activeWaiter} />}
           </>
         )}

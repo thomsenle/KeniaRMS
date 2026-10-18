@@ -18,27 +18,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
   if (!isOpen) return null;
 
-  const handleDigit = (digit: string) => {
-    if (pin.length < 6) {
-      setPin(prev => prev + digit);
-      setError(null);
-    }
-  };
-
-  const handleBackspace = () => {
-    setPin(prev => prev.slice(0, -1));
-    setError(null);
-  };
-
-  const handleSubmit = async () => {
-    if (!pin) return;
+  const submitPin = async (pinToSubmit: string) => {
+    if (!pinToSubmit) return;
     setLoading(true);
     setError(null);
 
     try {
       const res = await apiRequest<{ success: boolean; waiter: Waiter; activeShift: any }>('/waiters/login', {
         method: 'POST',
-        body: JSON.stringify({ pin })
+        body: JSON.stringify({ pin: pinToSubmit })
       });
 
       onLoginSuccess(res.waiter, res.activeShift);
@@ -50,6 +38,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDigit = (digit: string) => {
+    if (pin.length < 6) {
+      const nextPin = pin + digit;
+      setPin(nextPin);
+      setError(null);
+      if (nextPin.length === 4) {
+        submitPin(nextPin);
+      }
+    }
+  };
+
+  const handleBackspace = () => {
+    setPin(prev => prev.slice(0, -1));
+    setError(null);
+  };
+
+  const handleSubmit = () => {
+    submitPin(pin);
   };
 
   return (

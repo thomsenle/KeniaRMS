@@ -13,6 +13,7 @@ export class POSController {
         FROM tables t
         LEFT JOIN waiters w ON t.active_waiter_id = w.id
         LEFT JOIN orders o ON t.id = o.table_id AND o.status IN ('open', 'partially_paid')
+        WHERE (t.is_active = 1 OR t.is_active IS NULL)
         ORDER BY t.table_number ASC
       `).all();
 
@@ -597,5 +598,299 @@ export class POSController {
       SET total_net = ?, total_tax = ?, total_levy = ?, total_gross = ?
       WHERE id = ?
     `).run(net, tax16, levy2, grossTotal, orderId);
+  }
+
+  // ==========================================
+  // MANAGER MODE: TABLES & AREAS MANAGEMENT
+  // ==========================================
+
+  // GET /pos/areas - List all restaurant dining areas with table counts
+  static getAreas(_req: Request, res: Response) {
+    try {
+      const areas = db.prepare(`
+        SELECT ra.id, ra.name, ra.display_order,
+               COUNT(t.id) as tables_count
+        FROM restaurant_areas ra
+        LEFT JOIN tables t ON t.area = ra.name AND (t.is_active = 1 OR t.is_active IS NULL)
+        GROUP BY ra.id
+        ORDER BY ra.display_order ASC, ra.name ASC
+      `).all();
+
+      res.json({ success: true, areas });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // POST /pos/areas - Create a new area
+  static createArea(req: Request, res: Response) {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Area name is required' });
+      }
+      const cleanName = name.trim();
+
+      const existing = db.prepare('SELECT id FROM restaurant_areas WHERE LOWER(name) = LOWER(?)').get(cleanName);
+      if (existing) {
+        return res.status(400).json({ success: false, message: 'An area with this name already exists' });
+      }
+
+      const id = uuidv4();
+      const maxOrder = db.prepare('SELECT MAX(display_order) as max_order FROM restaurant_areas').get() as any;
+      const nextOrder = (maxOrder?.max_order ?? 0) + 1;
+
+      db.prepare(`
+        INSERT INTO restaurant_areas (id, name, display_order)
+        VALUES (?, ?, ?)
+      `).run(id, cleanName, nextOrder);
+
+      io.emit('areas:updated');
+      io.emit('tables:updated');
+
+      const area = db.prepare('SELECT * FROM restaurant_areas WHERE id = ?').get(id);
+      res.json({ success: true, area });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // PUT /pos/areas/:areaId - Rename an area and cascade to tables
+  static updateArea(req: Request, res: Response) {
+    try {
+      const { areaId } = req.params;
+      const { name } = req.body;
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Area name is required' });
+      }
+      const cleanName = name.trim();
+
+      const existing = db.prepare('SELECT * FROM restaurant_areas WHERE id = ?').get(areaId) as any;
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Area not found' });
+      }
+
+      const duplicate = db.prepare('SELECT id FROM restaurant_areas WHERE LOWER(name) = LOWER(?) AND id != ?').get(cleanName, areaId);
+      if (duplicate) {
+        return res.status(400).json({ success: false, message: 'An area with this name already exists' });
+      }
+
+      const oldName = existing.name;
+
+      const updateTx = db.transaction(() => {
+        db.prepare('UPDATE restaurant_areas SET name = ? WHERE id = ?').run(cleanName, areaId);
+        // Cascade to tables
+        db.prepare('UPDATE tables SET area = ? WHERE area = ?').run(cleanName, oldName);
+      });
+      updateTx();
+
+      io.emit('areas:updated');
+      io.emit('tables:updated');
+
+      const updatedArea = db.prepare('SELECT * FROM restaurant_areas WHERE id = ?').get(areaId);
+      res.json({ success: true, area: updatedArea });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // DELETE /pos/areas/:areaId - Delete an empty area
+  static deleteArea(req: Request, res: Response) {
+    try {
+      const { areaId } = req.params;
+
+      const area = db.prepare('SELECT * FROM restaurant_areas WHERE id = ?').get(areaId) as any;
+      if (!area) {
+        return res.status(404).json({ success: false, message: 'Area not found' });
+      }
+
+      const assignedTables = db.prepare(`
+        SELECT COUNT(*) as count FROM tables 
+        WHERE area = ? AND (is_active = 1 OR is_active IS NULL)
+      `).get(area.name) as any;
+
+      if (assignedTables && assignedTables.count > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Cannot delete area "${area.name}" because it still contains ${assignedTables.count} table(s). Reassign or delete them first.` 
+        });
+      }
+
+      db.prepare('DELETE FROM restaurant_areas WHERE id = ?').run(areaId);
+
+      io.emit('areas:updated');
+      io.emit('tables:updated');
+
+      res.json({ success: true, message: 'Area deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // POST /pos/tables - Create a new table
+  static createTable(req: Request, res: Response) {
+    try {
+      const { table_number, name, area, guests_count } = req.body;
+
+      const num = Number(table_number);
+      if (!num || isNaN(num) || num <= 0) {
+        return res.status(400).json({ success: false, message: 'Valid positive table number is required' });
+      }
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Table name is required' });
+      }
+
+      const cleanArea = (area && typeof area === 'string' && area.trim()) ? area.trim() : 'Restaurant';
+
+      // Check if table_number is taken by an active table
+      const existing = db.prepare(`
+        SELECT id FROM tables 
+        WHERE table_number = ? AND (is_active = 1 OR is_active IS NULL)
+      `).get(num);
+
+      if (existing) {
+        return res.status(400).json({ success: false, message: `Table number ${num} is already taken` });
+      }
+
+      // Ensure the area exists in restaurant_areas
+      const areaRecord = db.prepare('SELECT id FROM restaurant_areas WHERE LOWER(name) = LOWER(?)').get(cleanArea);
+      if (!areaRecord) {
+        const newAreaId = uuidv4();
+        db.prepare('INSERT INTO restaurant_areas (id, name, display_order) VALUES (?, ?, 99)').run(newAreaId, cleanArea);
+        io.emit('areas:updated');
+      }
+
+      const id = uuidv4();
+      const guests = Number(guests_count) > 0 ? Number(guests_count) : 2;
+
+      db.prepare(`
+        INSERT INTO tables (id, table_number, name, area, status, guests_count, is_active)
+        VALUES (?, ?, ?, ?, 'free', ?, 1)
+      `).run(id, num, name.trim(), cleanArea, guests);
+
+      io.emit('tables:updated');
+
+      const createdTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(id);
+      res.json({ success: true, table: createdTable });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // PUT /pos/tables/:tableId - Update a table (number, name, area, seats)
+  static updateTable(req: Request, res: Response) {
+    try {
+      const { tableId } = req.params;
+      const { table_number, name, area, guests_count } = req.body;
+
+      const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId) as any;
+      if (!table) {
+        return res.status(404).json({ success: false, message: 'Table not found' });
+      }
+
+      const num = Number(table_number);
+      if (!num || isNaN(num) || num <= 0) {
+        return res.status(400).json({ success: false, message: 'Valid positive table number is required' });
+      }
+
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Table name is required' });
+      }
+
+      const cleanArea = (area && typeof area === 'string' && area.trim()) ? area.trim() : table.area;
+
+      // Check uniqueness of number against other active tables
+      const existingNum = db.prepare(`
+        SELECT id FROM tables 
+        WHERE table_number = ? AND id != ? AND (is_active = 1 OR is_active IS NULL)
+      `).get(num, tableId);
+
+      if (existingNum) {
+        return res.status(400).json({ success: false, message: `Table number ${num} is already used by another table` });
+      }
+
+      // Ensure the area exists in restaurant_areas
+      const areaRecord = db.prepare('SELECT id FROM restaurant_areas WHERE LOWER(name) = LOWER(?)').get(cleanArea);
+      if (!areaRecord) {
+        const newAreaId = uuidv4();
+        db.prepare('INSERT INTO restaurant_areas (id, name, display_order) VALUES (?, ?, 99)').run(newAreaId, cleanArea);
+        io.emit('areas:updated');
+      }
+
+      const guests = Number(guests_count) > 0 ? Number(guests_count) : (table.guests_count || 2);
+
+      db.prepare(`
+        UPDATE tables 
+        SET table_number = ?, name = ?, area = ?, guests_count = ?
+        WHERE id = ?
+      `).run(num, name.trim(), cleanArea, guests, tableId);
+
+      io.emit('tables:updated');
+
+      const updatedTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId);
+      res.json({ success: true, table: updatedTable });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // DELETE /pos/tables/:tableId - Delete table (safe check against active orders)
+  static deleteTable(req: Request, res: Response) {
+    try {
+      const { tableId } = req.params;
+
+      const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId) as any;
+      if (!table) {
+        return res.status(404).json({ success: false, message: 'Table not found' });
+      }
+
+      // Disallow if currently occupied
+      if (table.status !== 'free') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Cannot delete table: Table is currently occupied. Settle or cancel open orders first.' 
+        });
+      }
+
+      // Disallow if active open/partially_paid orders exist
+      const openOrders = db.prepare(`
+        SELECT COUNT(*) as count FROM orders 
+        WHERE table_id = ? AND status IN ('open', 'partially_paid')
+      `).get(tableId) as any;
+
+      if (openOrders && openOrders.count > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Cannot delete table: Table has active open orders.' 
+        });
+      }
+
+      // Check if table is referenced in any historical closed orders
+      const historicalOrders = db.prepare(`
+        SELECT COUNT(*) as count FROM orders WHERE table_id = ?
+      `).get(tableId) as any;
+
+      if (historicalOrders && historicalOrders.count > 0) {
+        // Soft-delete to preserve FK and past receipts/reports
+        // Invert number so the original number is immediately free for new tables
+        const newNum = -Math.abs(table.table_number);
+        db.prepare(`
+          UPDATE tables 
+          SET is_active = 0, table_number = ?
+          WHERE id = ?
+        `).run(newNum, tableId);
+      } else {
+        // Safe to hard delete
+        db.prepare('DELETE FROM tables WHERE id = ?').run(tableId);
+      }
+
+      io.emit('tables:updated');
+
+      res.json({ success: true, message: 'Table deleted successfully' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 }

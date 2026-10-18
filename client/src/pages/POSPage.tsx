@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Order, OrderItem, Recipe, Waiter, WaiterShift } from '../types';
+import { Table, Order, OrderItem, Recipe, Waiter, WaiterShift, RestaurantArea } from '../types';
 import { apiRequest, formatKES, socket } from '../api/client';
 import { useTranslation } from '../i18n';
 import { SplitBillModal } from '../components/SplitBillModal';
+import { TableManagerModal } from '../components/TableManagerModal';
 import { 
   Users, 
   Send, 
@@ -17,7 +18,8 @@ import {
   UtensilsCrossed, 
   Wine,
   ChevronLeft,
-  ShoppingBag
+  ShoppingBag,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface POSPageProps {
@@ -46,15 +48,22 @@ export const POSPage: React.FC<POSPageProps> = ({ activeWaiter, activeShift, onO
   // Modals
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isTableManagerOpen, setIsTableManagerOpen] = useState(false);
+  const [areaList, setAreaList] = useState<string[]>(['All']);
   const [targetTransferTableId, setTargetTransferTableId] = useState<string>('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
 
   useEffect(() => {
     loadTables();
+    loadAreas();
     loadRecipes();
 
     // Socket events
-    socket.on('tables:updated', loadTables);
+    socket.on('tables:updated', () => {
+      loadTables();
+      loadAreas();
+    });
+    socket.on('areas:updated', loadAreas);
     socket.on('order:cart_updated', (data: { orderId: string }) => {
       if (activeOrder && activeOrder.id === data.orderId) {
         loadOrderForTable(selectedTable!.id);
@@ -69,10 +78,22 @@ export const POSPage: React.FC<POSPageProps> = ({ activeWaiter, activeShift, onO
 
     return () => {
       socket.off('tables:updated');
+      socket.off('areas:updated');
       socket.off('order:cart_updated');
       socket.off('order:sent');
     };
   }, [selectedTable, activeOrder]);
+
+  const loadAreas = async () => {
+    try {
+      const res = await apiRequest<{ success: boolean; areas: RestaurantArea[] }>('/pos/areas');
+      if (res.success && res.areas) {
+        setAreaList(['All', ...res.areas.map(a => a.name)]);
+      }
+    } catch (err: any) {
+      console.error('Failed to load areas:', err);
+    }
+  };
 
   const loadTables = async () => {
     try {
@@ -232,7 +253,7 @@ export const POSPage: React.FC<POSPageProps> = ({ activeWaiter, activeShift, onO
   };
 
   // Filter tables
-  const areas = ['All', 'Restaurant', 'Terrace & Garden', 'Bar', 'VIP'];
+  const areas = areaList.length > 1 ? areaList : ['All', ...Array.from(new Set(tables.map(t => t.area).filter(Boolean)))];
   const filteredTables = tables.filter(t => selectedArea === 'All' || t.area === selectedArea);
 
   // Filter recipes
@@ -491,15 +512,48 @@ export const POSPage: React.FC<POSPageProps> = ({ activeWaiter, activeShift, onO
             ))}
           </div>
 
-          {selectedTable && (
-            <button 
-              className="btn btn-secondary" 
-              onClick={() => { setSelectedTable(null); setActiveOrder(null); }}
-              style={{ fontSize: '0.82rem', padding: '6px 12px' }}
-            >
-              <ChevronLeft size={16} /> {t('pos.back_to_tables')}
-            </button>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {!selectedTable && (activeWaiter?.role === 'manager' || activeWaiter?.role === 'admin') && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsTableManagerOpen(true)}
+                style={{
+                  fontSize: '0.82rem',
+                  padding: '6px 12px',
+                  borderColor: 'rgba(245, 158, 11, 0.45)',
+                  color: 'var(--primary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap'
+                }}
+                title={t('table_manager.manage_tables_areas')}
+              >
+                <SlidersHorizontal size={14} />
+                <span>{t('table_manager.manage_btn')}</span>
+                <span style={{
+                  fontSize: '0.62rem',
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  padding: '1px 5px',
+                  borderRadius: '4px',
+                  fontWeight: 800
+                }}>
+                  {t('table_manager.manager_badge')}
+                </span>
+              </button>
+            )}
+
+            {selectedTable && (
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => { setSelectedTable(null); setActiveOrder(null); }}
+                style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+              >
+                <ChevronLeft size={16} /> {t('pos.back_to_tables')}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* NOTIFICATION BANNER */}
@@ -853,6 +907,17 @@ export const POSPage: React.FC<POSPageProps> = ({ activeWaiter, activeShift, onO
           </div>
         </div>
       )}
+
+      {/* TABLE & AREA MANAGER MODAL (MANAGER-MODUS) */}
+      <TableManagerModal
+        isOpen={isTableManagerOpen}
+        onClose={() => setIsTableManagerOpen(false)}
+        activeWaiter={activeWaiter}
+        onTablesChanged={() => {
+          loadTables();
+          loadAreas();
+        }}
+      />
     </div>
   );
 };

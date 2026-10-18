@@ -1,6 +1,6 @@
 # KeniaRMS 🍽️🇰🇪
 
-[![Version](https://img.shields.io/badge/version-1.0.0-amber.svg)](https://github.com/thomsenle/KeniaRMS)
+[![Version](https://img.shields.io/badge/version-1.1.0-amber.svg)](https://github.com/thomsenle/KeniaRMS)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Currency](https://img.shields.io/badge/Currency-KES%20(Kenyan%20Shilling)-emerald.svg)]()
 [![VAT Rate](https://img.shields.io/badge/Kenya%20VAT-16%25-orange.svg)]()

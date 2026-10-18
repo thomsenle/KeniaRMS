@@ -12,8 +12,11 @@ import {
   UtensilsCrossed, 
   Image as ImageIcon, 
   Tv, 
-  Star
+  Star,
+  Sparkles,
+  Check
 } from 'lucide-react';
+import { AiRecipeModal } from '../components/AiRecipeModal';
 
 export const RecipesPage: React.FC = () => {
   const { t } = useTranslation();
@@ -23,7 +26,11 @@ export const RecipesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Modal
+  // AI Assistant Modal State
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiNotification, setAiNotification] = useState<{ message: string; count: number } | null>(null);
+
+  // Manual Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Partial<Recipe> & { ingredients: RecipeIngredient[] }>({
     name: '',
@@ -220,10 +227,52 @@ export const RecipesPage: React.FC = () => {
           </p>
         </div>
 
-        <button className="btn btn-success" onClick={handleOpenCreate}>
-          <Plus size={18} /> {t('recipes.new_recipe_btn')}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setIsAiModalOpen(true)}
+            style={{
+              background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(168, 85, 247, 0.4)',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px'
+            }}
+          >
+            <Sparkles size={18} /> {t('recipes.ai_assistant_btn')}
+          </button>
+
+          <button className="btn btn-success" onClick={handleOpenCreate}>
+            <Plus size={18} /> {t('recipes.new_recipe_btn')}
+          </button>
+        </div>
       </div>
+
+      {/* AI Success Notification */}
+      {aiNotification && (
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.15)',
+          border: '1px solid #10b981',
+          color: '#34d399',
+          padding: '12px 18px',
+          borderRadius: 'var(--radius-sm)',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+        }}>
+          <Check size={20} />
+          <span style={{ fontWeight: 600 }}>
+            {t('recipes.ai_import_success', { name: aiNotification.message, count: aiNotification.count })}
+          </span>
+        </div>
+      )}
 
       {/* Filter Tabs & Search */}
       <div className="glass-panel" style={{ padding: '14px 18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -576,6 +625,18 @@ export const RecipesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* AI RECIPE ASSISTANT MODAL */}
+      <AiRecipeModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        inventory={inventory}
+        onRecipeImported={({ name, newlyCreatedCount }) => {
+          setAiNotification({ message: name, count: newlyCreatedCount });
+          setTimeout(() => setAiNotification(null), 6000);
+          loadData();
+        }}
+      />
     </div>
   );
 };

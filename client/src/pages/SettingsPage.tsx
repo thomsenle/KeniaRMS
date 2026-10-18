@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PrinterSetting, MpesaSetting, Waiter } from '../types';
+import { PrinterSetting, MpesaSetting, Waiter, AppSettings, AiGeneratedDish } from '../types';
 import { apiRequest } from '../api/client';
 import { useTranslation } from '../i18n';
 import { 
@@ -21,8 +21,15 @@ import {
   Copy,
   Send,
   Loader2,
-  Power
+  Power,
+  Table as TableIcon,
+  SlidersHorizontal,
+  Sparkles,
+  MapPin,
+  TrendingUp,
+  Percent
 } from 'lucide-react';
+import { TableManagerModal } from '../components/TableManagerModal';
 
 interface SettingsPageProps {
   activeWaiter?: Waiter | null;
@@ -40,7 +47,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
   const [authLoading, setAuthLoading] = useState(false);
 
   // Active Admin Tab
-  const [adminTab, setAdminTab] = useState<'printers' | 'mpesa' | 'staff' | 'system'>('printers');
+  const [adminTab, setAdminTab] = useState<'printers' | 'mpesa' | 'tables' | 'staff' | 'ai_pricing' | 'system'>('printers');
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+
+  // AI Pricing Settings State
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    pricing_location: 'Diani Beach',
+    pricing_radius_km: 15,
+    pricing_target_margin: 70,
+    has_gemini_key: false,
+    gemini_key_masked: '',
+    ai_provider: 'gemini'
+  });
+  const [customApiKeyInput, setCustomApiKeyInput] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
+  const [aiSaveSuccess, setAiSaveSuccess] = useState(false);
+
+  // AI Test Benchmark State
+  const [testDishPrompt, setTestDishPrompt] = useState('Diani Swahili Coconut Fish Curry');
+  const [testingAi, setTestingAi] = useState(false);
+  const [testBenchmarkResult, setTestBenchmarkResult] = useState<AiGeneratedDish | null>(null);
 
   // Printers State
   const [printers, setPrinters] = useState<PrinterSetting[]>([]);
@@ -90,6 +117,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
       loadPrinters();
       loadMpesaSettings();
       loadStaff();
+      loadAppSettings();
     }
   }, [isAdminUnlocked]);
 
@@ -125,6 +153,75 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
       if (next.length === 4) {
         handleVerifyAdminPin(next);
       }
+    }
+  };
+
+  // Load App & AI Settings
+  const loadAppSettings = async () => {
+    try {
+      const res = await apiRequest<{ success: boolean; settings: AppSettings }>('/settings');
+      if (res.success && res.settings) {
+        setAppSettings(res.settings);
+      }
+    } catch (err: any) {
+      console.error('Failed to load app settings:', err);
+    }
+  };
+
+  const handleSaveAiSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingAiSettings(true);
+    setAiSaveSuccess(false);
+
+    try {
+      const body: any = {
+        pricing_location: appSettings.pricing_location,
+        pricing_radius_km: appSettings.pricing_radius_km,
+        pricing_target_margin: appSettings.pricing_target_margin,
+        ai_provider: appSettings.ai_provider
+      };
+      if (customApiKeyInput.trim()) {
+        body.ai_gemini_api_key = customApiKeyInput.trim();
+      }
+
+      const res = await apiRequest<{ success: boolean; settings: AppSettings }>('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(body)
+      });
+
+      if (res.success && res.settings) {
+        setAppSettings(res.settings);
+        setCustomApiKeyInput('');
+        setAiSaveSuccess(true);
+        setTimeout(() => setAiSaveSuccess(false), 4000);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error saving AI settings');
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
+
+  const handleTestAiBenchmark = async () => {
+    setTestingAi(true);
+    setTestBenchmarkResult(null);
+    try {
+      const res = await apiRequest<{ success: boolean; dish: AiGeneratedDish }>('/settings/test-ai', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: testDishPrompt,
+          location: appSettings.pricing_location,
+          radius_km: appSettings.pricing_radius_km,
+          target_margin: appSettings.pricing_target_margin
+        })
+      });
+      if (res.success && res.dish) {
+        setTestBenchmarkResult(res.dish);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error running test benchmark');
+    } finally {
+      setTestingAi(false);
     }
   };
 
@@ -459,11 +556,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
         </button>
         <button
           type="button"
+          className={`btn ${adminTab === 'tables' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setAdminTab('tables')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <TableIcon size={17} /> {t('table_manager.tabs.tables')}
+        </button>
+        <button
+          type="button"
           className={`btn ${adminTab === 'staff' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setAdminTab('staff')}
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           <Users size={17} /> {t('settings.tab_staff')}
+        </button>
+        <button
+          type="button"
+          className={`btn ${adminTab === 'ai_pricing' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setAdminTab('ai_pricing')}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Sparkles size={17} /> {t('settings.tab_ai_pricing')}
         </button>
         <button
           type="button"
@@ -1033,6 +1146,260 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ activeWaiter }) => {
           </div>
         </div>
       )}
+
+      {/* TAB: AI & REGIONAL PRICING BENCHMARK */}
+      {adminTab === 'ai_pricing' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <Sparkles size={24} color="var(--primary)" />
+              <h2 style={{ fontSize: '1.3rem', margin: 0 }}>{t('settings.ai_pricing_title')}</h2>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '20px', lineHeight: 1.5 }}>
+              {t('settings.ai_pricing_subtitle')}
+            </p>
+
+            {aiSaveSuccess && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid #10b981',
+                color: '#34d399',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.88rem'
+              }}>
+                <Check size={18} /> {t('settings.ai_saved_success')}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAiSettings}>
+              {/* Presets */}
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  {t('settings.ai_presets_label')}
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: '🏖️ Diani Beach (South Coast)', loc: 'Diani Beach' },
+                    { label: '🌊 Mombasa (Nyali & Bamburi)', loc: 'Mombasa' },
+                    { label: '🌴 Watamu & Malindi', loc: 'Watamu' },
+                    { label: '🏙️ Nairobi (Westlands / Karen)', loc: 'Nairobi - Westlands' },
+                    { label: '⛵ Lamu Island', loc: 'Lamu' }
+                  ].map(preset => (
+                    <button
+                      key={preset.loc}
+                      type="button"
+                      className={`btn ${appSettings.pricing_location.toLowerCase().includes(preset.loc.toLowerCase()) ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setAppSettings(prev => ({ ...prev, pricing_location: preset.loc }))}
+                      style={{ fontSize: '0.82rem', padding: '6px 12px', borderRadius: 'var(--radius-full)' }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Form Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    <MapPin size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                    {t('settings.ai_location_label')}
+                  </label>
+                  <input
+                    type="text"
+                    value={appSettings.pricing_location}
+                    onChange={e => setAppSettings(prev => ({ ...prev, pricing_location: e.target.value }))}
+                    placeholder={t('settings.ai_location_placeholder')}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    {t('settings.ai_radius_label')}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={appSettings.pricing_radius_km}
+                    onChange={e => setAppSettings(prev => ({ ...prev, pricing_radius_km: Number(e.target.value) || 15 }))}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    <Percent size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                    {t('settings.ai_margin_label')}
+                  </label>
+                  <input
+                    type="number"
+                    min="20"
+                    max="90"
+                    value={appSettings.pricing_target_margin}
+                    onChange={e => setAppSettings(prev => ({ ...prev, pricing_target_margin: Number(e.target.value) || 70 }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* API Key Configuration */}
+              <div style={{ background: 'var(--bg-surface)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    {t('settings.ai_gemini_key_label')}
+                  </label>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    background: appSettings.has_gemini_key ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                    color: appSettings.has_gemini_key ? '#34d399' : '#818cf8',
+                    border: '1px solid ' + (appSettings.has_gemini_key ? 'rgba(16, 185, 129, 0.3)' : 'rgba(99, 102, 241, 0.3)')
+                  }}>
+                    {appSettings.has_gemini_key ? `Google Gemini (${appSettings.gemini_key_masked})` : 'Offline Kenia-Coast Hospitality Engine (Aktiv)'}
+                  </span>
+                </div>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    placeholder={appSettings.has_gemini_key ? '•••••••••••••••••••• (Key hinterlegt - eingeben zum Überschreiben)' : t('settings.ai_gemini_key_placeholder')}
+                    value={customApiKeyInput}
+                    onChange={e => setCustomApiKeyInput(e.target.value)}
+                    style={{ paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+                  >
+                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.78rem', marginTop: '6px', lineHeight: 1.4 }}>
+                  {t('settings.ai_gemini_key_hint')}
+                </p>
+              </div>
+
+              <button type="submit" className="btn btn-primary" disabled={savingAiSettings} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                {savingAiSettings ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+                {savingAiSettings ? t('settings.ai_saving') : t('settings.ai_save_btn')}
+              </button>
+            </form>
+          </div>
+
+          {/* Interactive Benchmark Test Card */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <TrendingUp size={20} color="var(--primary)" /> {t('settings.ai_test_title')}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Teste die regionale Preisberechnung für Gerichte im gewählten Umkreis von <strong>{appSettings.pricing_location}</strong>.
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                value={testDishPrompt}
+                onChange={e => setTestDishPrompt(e.target.value)}
+                placeholder={t('settings.ai_test_dish_placeholder')}
+                style={{ flex: 1, minWidth: '240px' }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleTestAiBenchmark}
+                disabled={testingAi || !testDishPrompt.trim()}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                {testingAi ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+                {t('settings.ai_test_btn')}
+              </button>
+            </div>
+
+            {testBenchmarkResult && (
+              <div style={{ background: 'var(--bg-surface)', padding: '18px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>{testBenchmarkResult.name}</h4>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '4px' }}>{testBenchmarkResult.description}</p>
+                  </div>
+                  <span className="badge badge-success" style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
+                    Empfohlener Preis: KES {testBenchmarkResult.suggested_price.toLocaleString()}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('recipes.ai_competitor_min')}</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#93c5fd' }}>KES {testBenchmarkResult.market_benchmark.min_price.toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('recipes.ai_competitor_avg')}</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#34d399' }}>KES {testBenchmarkResult.market_benchmark.avg_price.toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('recipes.ai_competitor_max')}</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fbbf24' }}>KES {testBenchmarkResult.market_benchmark.max_price.toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('recipes.ai_food_cost_kes')}</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--primary)' }}>KES {testBenchmarkResult.market_benchmark.food_cost_kes.toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t('recipes.ai_gross_margin')}</span>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#a7f3d0' }}>{testBenchmarkResult.market_benchmark.gross_margin_percent}%</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-dim)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', lineHeight: 1.4 }}>
+                  <strong>{t('recipes.ai_rationale_title')}</strong> {testBenchmarkResult.market_benchmark.rationale}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TABLES & AREAS */}
+      {adminTab === 'tables' && (
+        <div className="glass-panel" style={{ padding: '36px 24px', textAlign: 'center' }}>
+          <div style={{ maxWidth: '520px', margin: '0 auto' }}>
+            <TableIcon size={48} color="var(--primary)" style={{ marginBottom: '14px' }} />
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>
+              {t('table_manager.title')}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '22px', lineHeight: 1.6 }}>
+              {t('table_manager.subtitle')}
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => setIsTableModalOpen(true)}
+              style={{ padding: '12px 24px', fontSize: '1rem', margin: '0 auto' }}
+            >
+              <SlidersHorizontal size={18} />
+              {t('table_manager.manage_tables_areas')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TABLE MANAGER MODAL */}
+      <TableManagerModal
+        isOpen={isTableModalOpen}
+        onClose={() => setIsTableModalOpen(false)}
+        activeWaiter={activeWaiter || null}
+        onTablesChanged={() => {}}
+      />
     </div>
   );
 };
